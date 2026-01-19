@@ -196,7 +196,7 @@ chore: upgrade Entity Framework to 9.0.0
   - Ví dụ: `feature/khank/catalog-service`
 - `fix/<your_name>/short-desc`
   - Ví dụ: `fix/khank/null-user`
-- `hotfix/<your_name>/short-desc`
+- hotfix/<your_name>/short-desc
   - Dùng khi sửa gấp trên main
 
 **Quy trình cơ bản:**
@@ -213,7 +213,7 @@ chore: upgrade Entity Framework to 9.0.0
    git commit -m "feat(catalog): add product CRUD endpoints"
    ```
 
-3. Push và tạo Pull Request vào `develop` (hoặc `main` cho hotfix/release).
+3. Push và tạo Pull Request vào `develop` (hoặc `main` for hotfix/release).
    ```sh
    git push origin feature/yourname/short-desc
    ```
