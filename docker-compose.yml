@@ -1,17 +1,16 @@
 version: '3.8'
 
 services:
-  # SQL Server Database
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: sqlserver
+  # MySQL Database
+  clothes-db:
+    image: mysql:8.0
+    container_name: clothes-db
     environment:
-      - ACCEPT_EULA=Y
-      - SA_PASSWORD=YourStrong@Password123
+      - MYSQL_ROOT_PASSWORD=123456
     ports:
-      - "1433:1433"
+      - "3306:3306"
     volumes:
-      - sqlserver-data:/var/opt/mssql
+      - mysql-data:/var/lib/mysql
     networks:
       - clothesshop-network
 
@@ -46,11 +45,11 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
-      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=IdentityDb;User Id=sa;Password=YourStrong@Password123;TrustServerCertificate=True
+      - ConnectionStrings__DefaultConnection=Server=clothes-db;Port=3306;Database=IdentityDb;User=root;Password=123456;
     ports:
       - "5001:80"
     depends_on:
-      - sqlserver
+      - clothes-db
     networks:
       - clothesshop-network
 
@@ -63,11 +62,11 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
-      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=CatalogDb;User Id=sa;Password=YourStrong@Password123;TrustServerCertificate=True
+      - ConnectionStrings__DefaultConnection=Server=clothes-db;Port=3306;Database=CatalogDb;User=root;Password=123456;
     ports:
       - "5002:80"
     depends_on:
-      - sqlserver
+      - clothes-db
     networks:
       - clothesshop-network
 
@@ -97,12 +96,12 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
-      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=OrderingDb;User Id=sa;Password=YourStrong@Password123;TrustServerCertificate=True
+      - ConnectionStrings__DefaultConnection=Server=clothes-db;Port=3306;Database=OrderingDb;User=root;Password=123456;
       - EventBus__Connection=rabbitmq
     ports:
       - "5004:80"
     depends_on:
-      - sqlserver
+      - clothes-db
       - rabbitmq
     networks:
       - clothesshop-network
@@ -142,7 +141,7 @@ services:
       - clothesshop-network
 
 volumes:
-  sqlserver-data:
+  mysql-data:
 
 networks:
   clothesshop-network:
