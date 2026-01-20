@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  clothes-db:
+    image: mysql:8.0
+    container_name: clothes-db
+    environment:
+      - MYSQL_ROOT_PASSWORD=123456
+      - MYSQL_DATABASE=social
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - clothesshop-network
+
+  # Redis Cache
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - clothesshop-network
+
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - clothesshop-network
+
+volumes:
+  mysql-data:
+
+networks:
+  clothesshop-network:
+    driver: bridge
