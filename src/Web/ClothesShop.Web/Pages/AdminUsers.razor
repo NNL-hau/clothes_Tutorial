@@ -1,0 +1,102 @@
+@page "/admin/users"
+@layout AdminLayout
+
+<div class="admin-users">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <div>
+            <h2 style="font-weight: 800; color: var(--text-main); font-size: 2rem; margin: 0;">Quản lý Tài khoản</h2>
+            <p style="color: var(--text-muted); margin: 0;">Quản lý quyền hạn và thông tin người dùng hệ thống</p>
+        </div>
+        <button class="btn btn-primary-fashion">
+            <i class="fa-solid fa-user-plus me-2"></i> Thêm quản trị viên
+        </button>
+    </div>
+
+    <div class="glass-card p-4">
+        <div class="table-container">
+            <table class="table-fashion">
+                <thead>
+                    <tr>
+                        <th>Người dùng</th>
+                        <th>Email</th>
+                        <th>Vai trò</th>
+                        <th>Ngày tham gia</th>
+                        <th class="text-center">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in Users)
+                    {
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="avatar-premium" style="background: @GetAvatarBg(u.Role);">
+                                        @u.FullName.Substring(0, 1)
+                                    </div>
+                                    <div style="font-weight: 700; color: var(--text-main);">@u.FullName</div>
+                                </div>
+                            </td>
+                            <td><span style="color: var(--text-muted);">@u.Email</span></td>
+                            <td>
+                                <span class="role-badge @(u.Role == "Admin" ? "badge-admin" : "badge-user")">
+                                    <i class="fa-solid @(u.Role == "Admin" ? "fa-crown" : "fa-user") me-2"></i>
+                                    @u.Role
+                                </span>
+                            </td>
+                            <td>
+                                <div style="color: var(--text-main); font-weight: 500;">@u.CreatedAt.ToString("dd/MM/yyyy")</div>
+                            </td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn-action edit" title="Chỉnh sửa"><i class="fa-solid fa-user-pen"></i></button>
+                                    <button class="btn-action delete" title="Khóa tài khoản"><i class="fa-solid fa-user-slash"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .avatar-premium {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 1.1rem;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    .role-badge {
+        padding: 0.5rem 1.2rem;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .badge-admin { background: #fef2f2; color: #dc2626; border: 1px solid #fee2e2; }
+    .badge-user { background: #f0fdf4; color: #16a34a; border: 1px solid #dcfce7; }
+</style>
+
+@code {
+    private List<UserItem> Users = new()
+    {
+        new("Administrator", "admin@clothesshop.com", "Admin", DateTime.Now.AddYears(-1)),
+        new("Nguyễn Văn A", "vana@gmail.com", "Khách hàng", DateTime.Now.AddMonths(-3)),
+        new("Trần Thị B", "thib@gmail.com", "Khách hàng", DateTime.Now.AddMonths(-2)),
+        new("Lê Văn C", "vanc@gmail.com", "Nhân viên", DateTime.Now.AddMonths(-1))
+    };
+
+    private string GetAvatarBg(string role) => role == "Admin" ? "#6b46c1" : "#a29bfe";
+
+    public record UserItem(string FullName, string Email, string Role, DateTime CreatedAt);
+}
