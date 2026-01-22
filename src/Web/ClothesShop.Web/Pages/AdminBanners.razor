@@ -1,0 +1,90 @@
+@page "/admin/banners"
+@layout AdminLayout
+
+<div class="admin-banners">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <div>
+            <h2 style="font-weight: 800; color: var(--text-main); font-size: 2rem; margin: 0;">Quản lý Banner</h2>
+            <p style="color: var(--text-muted); margin: 0;">Quản lý các chiến dịch quảng cáo và hình ảnh nổi bật</p>
+        </div>
+        <button class="btn btn-primary-fashion">
+            <i class="fa-solid fa-cloud-arrow-up me-2"></i> Tải lên Banner mới
+        </button>
+    </div>
+
+    <div class="row g-4">
+        @foreach (var b in Banners)
+        {
+            <div class="col-md-6">
+                <div class="glass-card banner-item-card">
+                    <div class="banner-preview">
+                        <img src="@b.ImageUrl" />
+                        <div class="banner-status-overlay">
+                            <span class="status-badge" style="background: @(b.IsActive ? "var(--white)" : "#ffeb3b"); color: var(--text-main);">
+                                <i class="fa-solid @(b.IsActive ? "fa-eye" : "fa-eye-slash") me-1"></i>
+                                @(b.IsActive ? "Đang hoạt động" : "Bản nháp")
+                            </span>
+                        </div>
+                    </div>
+                    <div class="p-4">
+                        <h4 style="font-weight: 800; color: var(--text-main); margin-bottom: 0.5rem;">@b.Title</h4>
+                        <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.5rem;">@b.SubTitle</p>
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span style="font-size: 0.85rem; color: var(--text-muted);">Cập nhật: 2 ngày trước</span>
+                            <div class="action-buttons">
+                                <button class="btn-action edit"><i class="fa-solid fa-pencil"></i></button>
+                                <button class="btn-action delete"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .banner-item-card {
+        overflow: hidden;
+        border: none;
+    }
+
+    .banner-preview {
+        height: 220px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .banner-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: var(--transition);
+    }
+
+    .banner-item-card:hover .banner-preview img {
+        transform: scale(1.05);
+    }
+
+    .banner-status-overlay {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+    }
+
+    .banner-item-card .status-badge {
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+</style>
+
+@code {
+    private List<BannerItem> Banners = new()
+    {
+        new("Bộ sưu tập Mùa Xuân 2024", "Khám phá phong cách nhẹ nhàng và sang trọng", "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=800&fit=crop", true),
+        new("Xu hướng Denim 2024", "Cá tính và mạnh mẽ với chất liệu Jean bền bỉ", "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=800&fit=crop", true),
+        new("Thời trang Công sở", "Lịch lãm cho quý ông hiện đại", "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=800&fit=crop", false)
+    };
+
+    public record BannerItem(string Title, string SubTitle, string ImageUrl, bool IsActive);
+}

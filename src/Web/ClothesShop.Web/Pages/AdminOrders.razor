@@ -1,0 +1,157 @@
+@page "/admin/orders"
+@layout AdminLayout
+
+<div class="admin-orders">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <div>
+            <h2 style="font-weight: 800; color: var(--text-main); font-size: 2rem; margin: 0;">Quản lý Đơn hàng</h2>
+            <p style="color: var(--text-muted); margin: 0;">Theo dõi và xử lý đơn đặt hàng từ khách hàng</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-light-premium">
+                <i class="fa-solid fa-download me-2"></i> Xuất báo cáo
+            </button>
+        </div>
+    </div>
+
+    <div class="glass-card p-4">
+        <div class="d-flex gap-3 mb-4">
+            <div class="search-box-premium" style="flex: 1;">
+                <i class="fa-solid fa-magnifying-glass text-muted"></i>
+                <input type="text" placeholder="Tìm theo mã đơn, tên khách..." />
+            </div>
+            <div class="filter-tabs">
+                <button class="tab-btn active">Tất cả</button>
+                <button class="tab-btn">Chờ xử lý</button>
+                <button class="tab-btn">Đang giao</button>
+                <button class="tab-btn">Hoàn thành</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="table-fashion">
+                <thead>
+                    <tr>
+                        <th>Mã đơn hàng</th>
+                        <th>Khách hàng</th>
+                        <th>Thời gian đặt</th>
+                        <th>Tổng tiền</th>
+                        <th>Trạng thái</th>
+                        <th class="text-center">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var o in Orders)
+                    {
+                        <tr>
+                            <td><strong style="color: var(--primary-color);">#@o.Id</strong></td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="avatar-small">@o.CustomerName.Substring(0, 1)</div>
+                                    <div>
+                                        <div style="font-weight: 700; color: var(--text-main);">@o.CustomerName</div>
+                                        <div style="font-size: 0.8rem; color: var(--text-muted);">@o.Email</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="color: var(--text-main); font-weight: 500;">@o.OrderDate.ToString("dd/MM/yyyy")</div>
+                                <div style="font-size: 0.8rem; color: var(--text-muted);">@o.OrderDate.ToString("HH:mm")</div>
+                            </td>
+                            <td class="price-cell">@o.Total.ToString("N0") ₫</td>
+                            <td>
+                                <span class="status-badge-order" style="background: @GetStatusBg(o.Status); color: @GetStatusColor(o.Status);">
+                                    @o.Status
+                                </span>
+                            </td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn-action edit" title="Xem chi tiết"><i class="fa-solid fa-eye"></i></button>
+                                    <button class="btn-action edit" title="Cập nhật trạng thái"><i class="fa-solid fa-rotate"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Reuse some styles from Products or put in AdminLayout if frequent */
+    .filter-tabs {
+        display: flex;
+        background: #f1f3f9;
+        padding: 5px;
+        border-radius: 14px;
+        gap: 5px;
+    }
+
+    .tab-btn {
+        border: none;
+        background: transparent;
+        padding: 0.6rem 1.2rem;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        transition: var(--transition);
+    }
+
+    .tab-btn.active {
+        background: white;
+        color: var(--primary-color);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+
+    .avatar-small {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--primary-light);
+        color: var(--primary-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.8rem;
+    }
+
+    .status-badge-order {
+        padding: 0.4rem 1rem;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 0.8rem;
+    }
+</style>
+
+@code {
+    private List<OrderItem> Orders = new()
+    {
+        new("ORD-0842", "Phạm Hoàng Long", "longph@gmail.com", DateTime.Now.AddHours(-1), 1250000, "Đã hoàn thành"),
+        new("ORD-0841", "Lê Thu Thảo", "thao.le@hotmail.com", DateTime.Now.AddHours(-3), 850000, "Chờ xử lý"),
+        new("ORD-0840", "Nguyễn Minh Đức", "ducnm@yahoo.com", DateTime.Now.AddHours(-6), 2100000, "Đang giao"),
+        new("ORD-0839", "Võ Thị Mỹ Linh", "linhvo@gmail.com", DateTime.Now.AddDays(-1), 450000, "Đã hủy")
+    };
+
+    private string GetStatusBg(string status) => status switch
+    {
+        "Đã hoàn thành" => "#ecfdf5",
+        "Chờ xử lý" => "#fffbeb",
+        "Đang giao" => "#eff6ff",
+        "Đã hủy" => "#fff1f2",
+        _ => "#f1f3f9"
+    };
+
+    private string GetStatusColor(string status) => status switch
+    {
+        "Đã hoàn thành" => "#059669",
+        "Chờ xử lý" => "#d97706",
+        "Đang giao" => "#2563eb",
+        "Đã hủy" => "#e11d48",
+        _ => "#64748b"
+    };
+
+    public record OrderItem(string Id, string CustomerName, string Email, DateTime OrderDate, decimal Total, string Status);
+}

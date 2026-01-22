@@ -1,0 +1,103 @@
+@inherits LayoutComponentBase
+
+<div class="admin-layout">
+    <aside class="sidebar">
+        <a href="/admin" class="logo">
+            <i class="fa-solid fa-store"></i>
+            <span>Clothes Admin</span>
+        </a>
+
+        <div class="nav-group">
+            <div class="nav-group-title">Tổng quan</div>
+            <nav class="nav-list">
+                <NavLink class="nav-link-custom" href="/admin" Match="NavLinkMatch.All">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Bàn làm việc</span>
+                </NavLink>
+            </nav>
+        </div>
+
+        <div class="nav-group">
+            <div class="nav-group-title">Kinh doanh</div>
+            <nav class="nav-list">
+                <NavLink class="nav-link-custom" href="/admin/products">
+                    <i class="fa-solid fa-shirt"></i>
+                    <span>Sản phẩm</span>
+                </NavLink>
+                <NavLink class="nav-link-custom" href="/admin/orders">
+                    <i class="fa-solid fa-truck-fast"></i>
+                    <span>Đơn hàng</span>
+                </NavLink>
+                <NavLink class="nav-link-custom" href="/admin/inventory">
+                    <i class="fa-solid fa-box-open"></i>
+                    <span>Kho hàng</span>
+                </NavLink>
+            </nav>
+        </div>
+
+        <div class="nav-group">
+            <div class="nav-group-title">Khách hàng</div>
+            <nav class="nav-list">
+                <NavLink class="nav-link-custom" href="/admin/reviews">
+                    <i class="fa-solid fa-star-half-stroke"></i>
+                    <span>Bình luận</span>
+                </NavLink>
+                <NavLink class="nav-link-custom" href="/admin/users">
+                    <i class="fa-solid fa-user-group"></i>
+                    <span>Tài khoản</span>
+                </NavLink>
+            </nav>
+        </div>
+
+        <div class="nav-group">
+            <div class="nav-group-title">Hệ thống</div>
+            <nav class="nav-list">
+                <NavLink class="nav-link-custom" href="/admin/payments">
+                    <i class="fa-solid fa-money-check-dollar"></i>
+                    <span>Thanh toán</span>
+                </NavLink>
+                <NavLink class="nav-link-custom" href="/admin/banners">
+                    <i class="fa-solid fa-panorama"></i>
+                    <span>Banner Quảng cáo</span>
+                </NavLink>
+            </nav>
+        </div>
+
+        <div class="sidebar-footer">
+            <a href="/logout" class="nav-link-custom logout-btn">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>Đăng xuất</span>
+            </a>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="top-bar">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass" style="color: #94a3b8;"></i>
+                <input type="text" placeholder="Tìm nhanh..." />
+            </div>
+
+            <div class="top-actions">
+                <div style="position: relative; cursor: pointer;">
+                    <i class="fa-regular fa-bell" style="font-size: 1.2rem; color: #64748b;"></i>
+                    <span style="position: absolute; top: -4px; right: -4px; background: #ef4444; width: 7px; height: 7px; border-radius: 50%;"></span>
+                </div>
+                
+                <div class="user-profile">
+                    <div class="user-text">
+                        <span>Xin chào,</span>
+                        <strong>Quản trị viên</strong>
+                    </div>
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: #e2e8f0; display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-user-tie" style="color: #1a73e8; font-size: 1.2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="page-body">
+            @Body
+        </div>
+    </main>
+</div>
