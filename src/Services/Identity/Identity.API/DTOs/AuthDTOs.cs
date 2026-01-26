@@ -29,6 +29,12 @@ namespace Identity.API.DTOs
         [Required]
         public string Password { get; set; } = string.Empty;
     }
+
+    public class GoogleLoginRequest
+    {
+        [Required]
+        public string Token { get; set; } = string.Empty;
+    }
     
     public class AuthResponse
     {

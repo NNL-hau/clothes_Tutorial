@@ -12,7 +12,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 // Configure HttpClient for Identity API
 builder.Services.AddScoped(sp => new HttpClient 
 { 
-    BaseAddress = new Uri("https://localhost:5001/") // Identity API URL
+    BaseAddress = new Uri("http://localhost:5001/") // Identity API URL (Matching Docker Compose port 5001)
 });
 
 // Add Blazored LocalStorage

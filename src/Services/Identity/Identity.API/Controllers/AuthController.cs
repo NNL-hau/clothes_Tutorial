@@ -14,15 +14,18 @@ namespace Identity.API.Controllers
     {
         private readonly IdentityDbContext _context;
         private readonly IJwtService _jwtService;
+        private readonly IGoogleAuthService _googleAuthService;
         private readonly ILogger<AuthController> _logger;
         
         public AuthController(
             IdentityDbContext context,
             IJwtService jwtService,
+            IGoogleAuthService googleAuthService,
             ILogger<AuthController> logger)
         {
             _context = context;
             _jwtService = jwtService;
+            _googleAuthService = googleAuthService;
             _logger = logger;
         }
         
@@ -35,9 +38,15 @@ namespace Identity.API.Controllers
             try
             {
                 // Check if user already exists
+                // Check if user already exists (Email or FullName)
                 if (await _context.Users.AnyAsync(u => u.Email == request.Email))
                 {
-                    return BadRequest(new { message = "Email already registered" });
+                    return BadRequest(new { message = "Email đã tồn tại" });
+                }
+
+                if (await _context.Users.AnyAsync(u => u.FullName == request.FullName))
+                {
+                    return BadRequest(new { message = "Tên đăng nhập đã tồn tại" });
                 }
                 
                 // Create new user
@@ -146,6 +155,56 @@ namespace Identity.API.Controllers
             {
                 _logger.LogError(ex, "Error getting current user");
                 return StatusCode(500, new { message = "An error occurred" });
+            }
+        }
+
+        /// <summary>
+        /// Login with Google
+        /// </summary>
+        [HttpPost("google-login")]
+        public async Task<ActionResult<AuthResponse>> GoogleLogin([FromBody] GoogleLoginRequest request)
+        {
+            try
+            {
+                var payload = await _googleAuthService.VerifyGoogleTokenAsync(request.Token);
+                if (payload == null)
+                {
+                    return BadRequest(new { message = "Invalid Google Token" });
+                }
+
+                // Check if user exists
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == payload.Email);
+                if (user == null)
+                {
+                    // Create new user
+                    user = new User
+                    {
+                        Email = payload.Email,
+                        FullName = payload.Name,
+                        PasswordHash = "", // No password for Google users
+                        Role = "Customer",
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.Users.Add(user);
+                    await _context.SaveChangesAsync();
+                }
+
+                // Generate JWT token
+                var token = _jwtService.GenerateToken(user);
+
+                return Ok(new AuthResponse
+                {
+                    UserId = user.Id,
+                    Email = user.Email,
+                    FullName = user.FullName,
+                    Role = user.Role,
+                    Token = token
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during Google login");
+                return StatusCode(500, new { message = "An error occurred during Google login" });
             }
         }
     }

@@ -1,12 +1,35 @@
 ﻿@inherits LayoutComponentBase
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@inject IAuthService AuthService
+@using ClothesShop.Web.Services
+@inject NavigationManager Navigation
 
+<div class="page">
     <main>
         <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            <div class="nav-links">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Trang Chủ
+                </NavLink>
+                <NavLink class="nav-link" href="products">
+                    <span class="bi bi-shop-nav-menu" aria-hidden="true"></span> Sản Phẩm
+                </NavLink>
+                <NavLink class="nav-link" href="cart">
+                    <span class="bi bi-cart-fill-nav-menu" aria-hidden="true"></span> Giỏ Hàng
+                </NavLink>
+                
+                @if (isAuthenticated)
+                {
+                    <a class="nav-link" href="" @onclick="HandleLogout" @onclick:preventDefault>
+                        <span class="bi bi-person-x-fill-nav-menu" aria-hidden="true"></span> Đăng Xuất
+                    </a>
+                }
+                else
+                {
+                    <NavLink class="nav-link" href="login">
+                        <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> Đăng Nhập
+                    </NavLink>
+                }
+            </div>
         </div>
 
         <article class="content px-4">
@@ -14,3 +37,18 @@
         </article>
     </main>
 </div>
+
+@code {
+    private bool isAuthenticated = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await AuthService.IsAuthenticatedAsync();
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/", true);
+    }
+}

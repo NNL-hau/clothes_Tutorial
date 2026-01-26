@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Blazored.LocalStorage;
 using ClothesShop.Web.Models;
+using System.Text.Json;
 
 namespace ClothesShop.Web.Services
 {
@@ -9,6 +10,7 @@ namespace ClothesShop.Web.Services
     {
         Task<AuthResponse?> RegisterAsync(RegisterModel model);
         Task<AuthResponse?> LoginAsync(LoginModel model);
+        Task<AuthResponse?> GoogleLoginAsync(string token);
         Task LogoutAsync();
         Task<UserInfo?> GetCurrentUserAsync();
         Task<bool> IsAuthenticatedAsync();
@@ -46,11 +48,28 @@ namespace ClothesShop.Web.Services
                     return authResponse;
                 }
                 
-                return null;
+                // Detailed error parsing
+                var errorContent = await response.Content.ReadAsStringAsync();
+                try 
+                {
+                    // Attempt to parse as JSON error object { message: "..." }
+                    var doc = JsonDocument.Parse(errorContent);
+                    if (doc.RootElement.TryGetProperty("message", out var msg))
+                    {
+                        throw new Exception(msg.GetString());
+                    }
+                }
+                catch {}
+
+                throw new Exception(!string.IsNullOrEmpty(errorContent) ? errorContent : "Mất kết nối tới máy chủ (500)");
             }
-            catch
+            catch (HttpRequestException)
             {
-                return null;
+                throw new Exception($"Không thể kết nối tới máy chủ Backend tại {_httpClient.BaseAddress}. Hãy đảm bảo Identity.API đang chạy.");
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
             }
         }
         
@@ -72,11 +91,55 @@ namespace ClothesShop.Web.Services
                     return authResponse;
                 }
                 
-                return null;
+                var errorContent = await response.Content.ReadAsStringAsync();
+                 try 
+                {
+                    var doc = JsonDocument.Parse(errorContent);
+                    if (doc.RootElement.TryGetProperty("message", out var msg))
+                    {
+                        throw new Exception(msg.GetString());
+                    }
+                }
+                catch {}
+
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                     throw new Exception("Email hoặc mật khẩu không chính xác.");
+
+                throw new Exception(!string.IsNullOrEmpty(errorContent) ? errorContent : "Lỗi đăng nhập (500)");
             }
-            catch
+            catch (HttpRequestException)
             {
-                return null;
+                throw new Exception($"Không thể kết nối tới máy chủ Backend tại {_httpClient.BaseAddress}.");
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public async Task<AuthResponse?> GoogleLoginAsync(string token)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/auth/google-login", new { Token = token });
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+                    if (authResponse != null)
+                    {
+                        await _localStorage.SetItemAsStringAsync(TOKEN_KEY, authResponse.Token);
+                        _httpClient.DefaultRequestHeaders.Authorization = 
+                            new AuthenticationHeaderValue("Bearer", authResponse.Token);
+                    }
+                    return authResponse;
+                }
+                
+                throw new Exception("Google Login failed");
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Google Login Error: {ex.Message}");
             }
         }
         
