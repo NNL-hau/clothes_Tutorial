@@ -15,6 +15,8 @@ namespace ClothesShop.Web.Services
         Task<UserInfo?> GetCurrentUserAsync();
         Task<bool> IsAuthenticatedAsync();
         Task<string?> GetTokenAsync();
+        Task<string?> GetUserRoleAsync();
+        Task<string?> GetUserNameAsync();
     }
     
     public class AuthService : IAuthService
@@ -24,9 +26,9 @@ namespace ClothesShop.Web.Services
         private const string TOKEN_KEY = "authToken";
         private const string USER_KEY = "currentUser";
         
-        public AuthService(HttpClient httpClient, ILocalStorageService localStorage)
+        public AuthService(IHttpClientFactory httpClientFactory, ILocalStorageService localStorage)
         {
-            _httpClient = httpClient;
+            _httpClient = httpClientFactory.CreateClient("IdentityApi");
             _localStorage = localStorage;
         }
         
@@ -178,6 +180,18 @@ namespace ClothesShop.Web.Services
         public async Task<string?> GetTokenAsync()
         {
             return await _localStorage.GetItemAsStringAsync(TOKEN_KEY);
+        }
+
+        public async Task<string?> GetUserRoleAsync()
+        {
+            var user = await GetCurrentUserAsync();
+            return user?.Role;
+        }
+
+        public async Task<string?> GetUserNameAsync()
+        {
+            var user = await GetCurrentUserAsync();
+            return user?.FullName ?? user?.Email;
         }
     }
 }

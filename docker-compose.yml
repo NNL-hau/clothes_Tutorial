@@ -120,6 +120,23 @@ services:
     networks:
       - clothesshop-network
 
+  # Review Service
+  review-api:
+    build:
+      context: .
+      dockerfile: src/Services/Review/Review.API/Dockerfile
+    container_name: review-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Server=clothes-db;Port=3306;Database=ReviewDb;User=root;Password=123456;
+    ports:
+      - "5006:80"
+    depends_on:
+      - clothes-db
+    networks:
+      - clothesshop-network
+
   # API Gateway
   apigateway:
     build:
@@ -137,6 +154,7 @@ services:
       - basket-api
       - ordering-api
       - payment-api
+      - review-api
     networks:
       - clothesshop-network
 

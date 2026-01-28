@@ -1,0 +1,176 @@
+@using ClothesShop.Web.Models
+
+<nav aria-label="Pagination" class="pagination-container">
+    @if (TotalItems > 0)
+    {
+        <div class="pagination-info">
+            Hiển thị <strong>@StartItem</strong> - <strong>@EndItem</strong> trong tổng số <strong>@TotalItems</strong>
+        </div>
+        
+        <ul class="pagination-modern">
+            <li class="page-item @(CurrentPage == 1 ? "disabled" : "")">
+                <button class="page-link" @onclick="() => ChangePage(1)" disabled="@(CurrentPage == 1)">
+                    <i class="fa-solid fa-angles-left"></i>
+                </button>
+            </li>
+            
+            <li class="page-item @(CurrentPage == 1 ? "disabled" : "")">
+                <button class="page-link" @onclick="() => ChangePage(CurrentPage - 1)" disabled="@(CurrentPage == 1)">
+                    <i class="fa-solid fa-angle-left"></i>
+                </button>
+            </li>
+            
+            @foreach (var p in GetPageNumbers())
+            {
+                <li class="page-item @(CurrentPage == p ? "active" : "")">
+                    <button class="page-link" @onclick="() => ChangePage(p)">@p</button>
+                </li>
+            }
+            
+            <li class="page-item @(CurrentPage == TotalPages ? "disabled" : "")">
+                <button class="page-link" @onclick="() => ChangePage(CurrentPage + 1)" disabled="@(CurrentPage == TotalPages)">
+                    <i class="fa-solid fa-angle-right"></i>
+                </button>
+            </li>
+            
+            <li class="page-item @(CurrentPage == TotalPages ? "disabled" : "")">
+                <button class="page-link" @onclick="() => ChangePage(TotalPages)" disabled="@(CurrentPage == TotalPages)">
+                    <i class="fa-solid fa-angles-right"></i>
+                </button>
+            </li>
+        </ul>
+        
+        <div class="page-size-selector">
+            <label>Hiển thị:</label>
+            <select class="form-select-sm" @bind="PageSize" @bind:after="HandlePageSizeChanged">
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+            </select>
+        </div>
+    }
+</nav>
+
+<style>
+    .pagination-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.5rem 0;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .pagination-info {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+    }
+
+    .pagination-modern {
+        display: flex;
+        list-style: none;
+        gap: 0.3rem;
+        margin: 0;
+        padding: 0;
+    }
+
+    .page-item {
+        margin: 0;
+    }
+
+    .page-link {
+        border: 1px solid #e2e8f0;
+        background: white;
+        color: var(--text-main);
+        padding: 0.5rem 0.9rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: var(--transition);
+        font-weight: 600;
+        min-width: 38px;
+        text-align: center;
+    }
+
+    .page-link:hover:not(:disabled) {
+        background: var(--primary-light);
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+    }
+
+    .page-item.active .page-link {
+        background: var(--primary-color);
+        border-color: var(--primary-color);
+        color: white;
+    }
+
+    .page-item.disabled .page-link {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .page-size-selector {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+
+    .form-select-sm {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.4rem 0.8rem;
+        cursor: pointer;
+    }
+</style>
+
+@code {
+    [Parameter] public int CurrentPage { get; set; } = 1;
+    [Parameter] public int PageSize { get; set; } = 10;
+    [Parameter] public int TotalItems { get; set; }
+    [Parameter] public EventCallback<int> OnPageChanged { get; set; }
+    [Parameter] public EventCallback<int> OnPageSizeChanged { get; set; }
+
+    private int TotalPages => (int)Math.Ceiling(TotalItems / (double)PageSize);
+    private int StartItem => TotalItems == 0 ? 0 : (CurrentPage - 1) * PageSize + 1;
+    private int EndItem => Math.Min(CurrentPage * PageSize, TotalItems);
+
+    private async Task ChangePage(int newPage)
+    {
+        if (newPage < 1 || newPage > TotalPages || newPage == CurrentPage)
+            return;
+
+        CurrentPage = newPage;
+        await OnPageChanged.InvokeAsync(newPage);
+    }
+
+    private List<int> GetPageNumbers()
+    {
+        var pages = new List<int>();
+        var maxPagesToShow = 5;
+        var halfRange = maxPagesToShow / 2;
+
+        int start = Math.Max(1, CurrentPage - halfRange);
+        int end = Math.Min(TotalPages, start + maxPagesToShow - 1);
+
+        // Adjust start if we're near the end
+        if (end - start < maxPagesToShow - 1)
+        {
+            start = Math.Max(1, end - maxPagesToShow + 1);
+        }
+
+        for (int i = start; i <= end; i++)
+        {
+            pages.Add(i);
+        }
+
+        return pages;
+    }
+
+    private async Task HandlePageSizeChanged()
+    {
+        CurrentPage = 1; // Reset to first page when page size changes
+        await OnPageSizeChanged.InvokeAsync(PageSize);
+    }
+}

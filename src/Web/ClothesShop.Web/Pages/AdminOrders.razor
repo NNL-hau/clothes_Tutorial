@@ -1,5 +1,8 @@
 @page "/admin/orders"
 @layout AdminLayout
+@inherits AuthorizedPageBase
+@inject IOrderApiService OrderService
+@using ClothesShop.Web.Models
 
 <div class="admin-orders">
     <div class="d-flex justify-content-between align-items-center mb-5">
@@ -8,78 +11,193 @@
             <p style="color: var(--text-muted); margin: 0;">Theo dõi và xử lý đơn đặt hàng từ khách hàng</p>
         </div>
         <div class="d-flex gap-2">
-            <button class="btn btn-light-premium">
-                <i class="fa-solid fa-download me-2"></i> Xuất báo cáo
+            <button class="btn btn-light-premium" @onclick="ExportToCsv" disabled="@(!FilteredOrders.Any())">
+                <i class="fa-solid fa-download me-2"></i> Xuất báo cáo (CSV)
             </button>
         </div>
     </div>
 
-    <div class="glass-card p-4">
-        <div class="d-flex gap-3 mb-4">
-            <div class="search-box-premium" style="flex: 1;">
-                <i class="fa-solid fa-magnifying-glass text-muted"></i>
-                <input type="text" placeholder="Tìm theo mã đơn, tên khách..." />
-            </div>
-            <div class="filter-tabs">
-                <button class="tab-btn active">Tất cả</button>
-                <button class="tab-btn">Chờ xử lý</button>
-                <button class="tab-btn">Đang giao</button>
-                <button class="tab-btn">Hoàn thành</button>
-            </div>
+    @if (isLoading)
+    {
+        <div class="glass-card p-5 text-center">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-3 text-muted">Đang tải danh sách đơn hàng...</p>
         </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i>
+            @errorMessage
+            <button class="btn btn-sm btn-outline-danger ms-3" @onclick="LoadOrders">Thử lại</button>
+        </div>
+    }
+    else
+    {
+        <div class="glass-card p-4">
+            <div class="d-flex gap-3 mb-4">
+                <div class="search-box-premium" style="flex: 1;">
+                    <i class="fa-solid fa-magnifying-glass text-muted"></i>
+                    <input type="text" placeholder="Tìm theo mã đơn, tên khách..." @bind-value="searchTerm" @bind-value:event="oninput" />
+                </div>
+                <div class="filter-tabs">
+                    <button class="tab-btn @(selectedStatus == "" ? "active" : "")" @onclick='() => selectedStatus = ""'>Tất cả</button>
+                    <button class="tab-btn @(selectedStatus == "Pending" ? "active" : "")" @onclick='() => selectedStatus = "Pending"'>Chờ xử lý</button>
+                    <button class="tab-btn @(selectedStatus == "InProgress" ? "active" : "")" @onclick='() => selectedStatus = "InProgress"'>Đang giao</button>
+                    <button class="tab-btn @(selectedStatus == "Shipped" ? "active" : "")" @onclick='() => selectedStatus = "Shipped"'>Hoàn thành</button>
+                </div>
+            </div>
 
-        <div class="table-container">
-            <table class="table-fashion">
-                <thead>
-                    <tr>
-                        <th>Mã đơn hàng</th>
-                        <th>Khách hàng</th>
-                        <th>Thời gian đặt</th>
-                        <th>Tổng tiền</th>
-                        <th>Trạng thái</th>
-                        <th class="text-center">Thao tác</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var o in Orders)
-                    {
+            <div class="table-container">
+                <table class="table-fashion">
+                    <thead>
                         <tr>
-                            <td><strong style="color: var(--primary-color);">#@o.Id</strong></td>
-                            <td>
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="avatar-small">@o.CustomerName.Substring(0, 1)</div>
-                                    <div>
-                                        <div style="font-weight: 700; color: var(--text-main);">@o.CustomerName</div>
-                                        <div style="font-size: 0.8rem; color: var(--text-muted);">@o.Email</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>
-                                <div style="color: var(--text-main); font-weight: 500;">@o.OrderDate.ToString("dd/MM/yyyy")</div>
-                                <div style="font-size: 0.8rem; color: var(--text-muted);">@o.OrderDate.ToString("HH:mm")</div>
-                            </td>
-                            <td class="price-cell">@o.Total.ToString("N0") ₫</td>
-                            <td>
-                                <span class="status-badge-order" style="background: @GetStatusBg(o.Status); color: @GetStatusColor(o.Status);">
-                                    @o.Status
-                                </span>
-                            </td>
-                            <td>
-                                <div class="action-buttons">
-                                    <button class="btn-action edit" title="Xem chi tiết"><i class="fa-solid fa-eye"></i></button>
-                                    <button class="btn-action edit" title="Cập nhật trạng thái"><i class="fa-solid fa-rotate"></i></button>
-                                </div>
-                            </td>
+                            <th>Mã đơn hàng</th>
+                            <th>Khách hàng</th>
+                            <th>Thời gian đặt</th>
+                            <th>Tổng tiền</th>
+                            <th>Trạng thái</th>
+                            <th class="text-center">Thao tác</th>
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @foreach (var o in FilteredOrders)
+                        {
+                            <tr>
+                                <td><strong style="color: var(--primary-color);">#@o.Id.ToString().Substring(0, 8).ToUpper()</strong></td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="avatar-small">@o.UserName.Substring(0, 1)</div>
+                                        <div style="font-weight: 700; color: var(--text-main);">@o.UserName</div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div style="color: var(--text-main); font-weight: 500;">@o.CreatedAt.ToString("dd/MM/yyyy")</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-muted);">@o.CreatedAt.ToString("HH:mm")</div>
+                                </td>
+                                <td class="price-cell">@o.TotalPrice.ToString("N0") ₫</td>
+                                <td>
+                                    <span class="status-badge-order" style="background: @GetStatusBg(o.OrderStatus); color: @GetStatusColor(o.OrderStatus);">
+                                        @TranslateStatus(o.OrderStatus)
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-action edit" title="Xem chi tiết" @onclick="() => ShowOrderDetails(o)">
+                                            <i class="fa-solid fa-eye"></i>
+                                        </button>
+                                        <button class="btn-action edit" title="Cập nhật trạng thái" @onclick="() => ShowUpdateStatusModal(o)">
+                                            <i class="fa-solid fa-rotate"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                @if (!FilteredOrders.Any())
+                {
+                    <div class="text-center py-5">
+                        <i class="fa-solid fa-box-open" style="font-size: 3rem; color: var(--text-muted);"></i>
+                        <p class="mt-3 text-muted">Không tìm thấy đơn hàng nào</p>
+                    </div>
+                }
+            </div>
         </div>
-    </div>
+    }
 </div>
 
+@* Order Details Modal *@
+@if (showDetailsModal && selectedOrder != null)
+{
+    <div class="modal-overlay" @onclick="CloseDetailsModal">
+        <div class="modal-dialog-custom large" @onclick:stopPropagation>
+            <div class="modal-header-custom">
+                <h4><i class="fa-solid fa-receipt me-2"></i>Chi tiết đơn hàng #@selectedOrder.Id.ToString().Substring(0, 8).ToUpper()</h4>
+                <button class="btn-close-custom" @onclick="CloseDetailsModal">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Khách hàng</h6>
+                        <p class="mb-0"><strong>@selectedOrder.UserName</strong></p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Ngày đặt</h6>
+                        <p class="mb-0">@selectedOrder.CreatedAt.ToString("dd/MM/yyyy HH:mm")</p>
+                    </div>
+                </div>
+
+                <h6 class="text-muted mb-3">Sản phẩm đặt mua</h6>
+                <div class="order-items">
+                    @foreach (var item in selectedOrder.OrderItems)
+                    {
+                        <div class="order-item-row">
+                            <div>
+                                <strong>@item.ProductName</strong>
+                                <div class="text-muted small">Số lượng: @item.Quantity</div>
+                            </div>
+                            <div class="text-end">
+                                <strong>@item.Price.ToString("N0") ₫</strong>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="order-total">
+                    <strong>Tổng cộng:</strong>
+                    <strong class="text-primary">@selectedOrder.TotalPrice.ToString("N0") ₫</strong>
+                </div>
+            </div>
+            <div class="modal-footer-custom">
+                <button class="btn btn-secondary-custom" @onclick="CloseDetailsModal">Đóng</button>
+            </div>
+        </div>
+    </div>
+}
+
+@* Update Status Modal *@
+@if (showStatusModal && orderToUpdate != null)
+{
+    <div class="modal-overlay" @onclick="CloseStatusModal">
+        <div class="modal-dialog-custom" @onclick:stopPropagation>
+            <div class="modal-header-custom">
+                <h4><i class="fa-solid fa-rotate me-2"></i>Cập nhật trạng thái đơn hàng</h4>
+                <button class="btn-close-custom" @onclick="CloseStatusModal">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <p>Đơn hàng: <strong>#@orderToUpdate.Id.ToString().Substring(0, 8).ToUpper()</strong></p>
+                <div class="form-group">
+                    <label class="form-label-custom">Trạng thái mới</label>
+                    <select class="form-control-custom" @bind="newStatus">
+                        <option value="Pending">Chờ xử lý</option>
+                        <option value="InProgress">Đang xử lý</option>
+                        <option value="Shipped">Đã giao hàng</option>
+                        <option value="Cancelled">Đã hủy</option>
+                    </select>
+                </div>
+
+                @if (!string.IsNullOrEmpty(statusError))
+                {
+                    <div class="alert alert-danger mt-3">@statusError</div>
+                }
+            </div>
+            <div class="modal-footer-custom">
+                <button class="btn btn-secondary-custom" @onclick="CloseStatusModal">Hủy</button>
+                <button class="btn btn-primary-custom" @onclick="UpdateOrderStatus" disabled="@isUpdating">
+                    @if (isUpdating)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Cập nhật
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
 <style>
-    /* Reuse some styles from Products or put in AdminLayout if frequent */
     .filter-tabs {
         display: flex;
         background: #f1f3f9;
@@ -97,6 +215,7 @@
         font-size: 0.9rem;
         color: var(--text-muted);
         transition: var(--transition);
+        cursor: pointer;
     }
 
     .tab-btn.active {
@@ -124,34 +243,199 @@
         font-weight: 700;
         font-size: 0.8rem;
     }
+
+    .order-items {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 1rem;
+    }
+
+    .order-item-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 1rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .order-item-row:last-child {
+        border-bottom: none;
+    }
+
+    .order-total {
+        display: flex;
+        justify-content: space-between;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 12px;
+        font-size: 1.1rem;
+    }
+
+    .modal-dialog-custom.large {
+        max-width: 700px;
+    }
 </style>
 
+@inject IJSRuntime JS
+
 @code {
-    private List<OrderItem> Orders = new()
+    private List<OrderDto> orders = new();
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private string searchTerm = string.Empty;
+    private string selectedStatus = string.Empty;
+
+    // Order details modal
+    private bool showDetailsModal = false;
+    private OrderDto? selectedOrder = null;
+
+    // Update status modal
+    private bool showStatusModal = false;
+    private bool isUpdating = false;
+    private string statusError = string.Empty;
+    private OrderDto? orderToUpdate = null;
+    private string newStatus = string.Empty;
+
+    private IEnumerable<OrderDto> FilteredOrders
     {
-        new("ORD-0842", "Phạm Hoàng Long", "longph@gmail.com", DateTime.Now.AddHours(-1), 1250000, "Đã hoàn thành"),
-        new("ORD-0841", "Lê Thu Thảo", "thao.le@hotmail.com", DateTime.Now.AddHours(-3), 850000, "Chờ xử lý"),
-        new("ORD-0840", "Nguyễn Minh Đức", "ducnm@yahoo.com", DateTime.Now.AddHours(-6), 2100000, "Đang giao"),
-        new("ORD-0839", "Võ Thị Mỹ Linh", "linhvo@gmail.com", DateTime.Now.AddDays(-1), 450000, "Đã hủy")
+        get
+        {
+            var filtered = orders.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                filtered = filtered.Where(o => 
+                    o.Id.ToString().Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    o.UserName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedStatus))
+            {
+                filtered = filtered.Where(o => o.OrderStatus == selectedStatus);
+            }
+
+            return filtered.OrderByDescending(o => o.CreatedAt);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrders();
+    }
+
+    private async Task LoadOrders()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        try
+        {
+            orders = await OrderService.GetOrdersAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi tải danh sách đơn hàng: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string TranslateStatus(string status) => status switch
+    {
+        "Pending" => "Chờ xử lý",
+        "InProgress" => "Đang xử lý",
+        "Shipped" => "Đã giao hàng",
+        "Cancelled" => "Đã hủy",
+        _ => status
     };
 
     private string GetStatusBg(string status) => status switch
     {
-        "Đã hoàn thành" => "#ecfdf5",
-        "Chờ xử lý" => "#fffbeb",
-        "Đang giao" => "#eff6ff",
-        "Đã hủy" => "#fff1f2",
+        "Shipped" => "#ecfdf5",
+        "Pending" => "#fffbeb",
+        "InProgress" => "#eff6ff",
+        "Cancelled" => "#fff1f2",
         _ => "#f1f3f9"
     };
 
     private string GetStatusColor(string status) => status switch
     {
-        "Đã hoàn thành" => "#059669",
-        "Chờ xử lý" => "#d97706",
-        "Đang giao" => "#2563eb",
-        "Đã hủy" => "#e11d48",
+        "Shipped" => "#059669",
+        "Pending" => "#d97706",
+        "InProgress" => "#2563eb",
+        "Cancelled" => "#e11d48",
         _ => "#64748b"
     };
 
-    public record OrderItem(string Id, string CustomerName, string Email, DateTime OrderDate, decimal Total, string Status);
+    private void ShowOrderDetails(OrderDto order)
+    {
+        selectedOrder = order;
+        showDetailsModal = true;
+    }
+
+    private void CloseDetailsModal()
+    {
+        showDetailsModal = false;
+        selectedOrder = null;
+    }
+
+    private void ShowUpdateStatusModal(OrderDto order)
+    {
+        orderToUpdate = order;
+        newStatus = order.OrderStatus;
+        statusError = string.Empty;
+        showStatusModal = true;
+    }
+
+    private void CloseStatusModal()
+    {
+        showStatusModal = false;
+        orderToUpdate = null;
+        statusError = string.Empty;
+    }
+
+    private async Task UpdateOrderStatus()
+    {
+        if (orderToUpdate == null) return;
+
+        isUpdating = true;
+        statusError = string.Empty;
+
+        try
+        {
+            var success = await OrderService.UpdateOrderStatusAsync(orderToUpdate.Id, newStatus);
+            if (success)
+            {
+                await LoadOrders();
+                CloseStatusModal();
+            }
+            else
+            {
+                statusError = "Lỗi cập nhật trạng thái";
+            }
+        }
+        catch (Exception ex)
+        {
+            statusError = $"Lỗi: {ex.Message}";
+        }
+        finally
+        {
+            isUpdating = false;
+        }
+    }
+    private async Task ExportToCsv()
+    {
+        var csv = new System.Text.StringBuilder();
+        csv.AppendLine("ID,Customer,Date,Total,Status");
+        
+        foreach (var o in FilteredOrders)
+        {
+            csv.AppendLine($"{o.Id},{o.UserName},{o.CreatedAt:yyyy-MM-dd HH:mm},{o.TotalPrice},{o.OrderStatus}");
+        }
+
+        var bytes = System.Text.Encoding.UTF8.GetBytes(csv.ToString());
+        var base64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("downloadFile", "orders_report.csv", "text/csv", base64);
+    }
 }

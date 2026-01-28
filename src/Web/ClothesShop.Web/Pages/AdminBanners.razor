@@ -1,5 +1,9 @@
 @page "/admin/banners"
 @layout AdminLayout
+@inherits AuthorizedPageBase
+@inject IBannerApiService BannerService
+@using ClothesShop.Web.Models
+@using ClothesShop.Web.Components
 
 <div class="admin-banners">
     <div class="d-flex justify-content-between align-items-center mb-5">
@@ -7,42 +11,186 @@
             <h2 style="font-weight: 800; color: var(--text-main); font-size: 2rem; margin: 0;">Quản lý Banner</h2>
             <p style="color: var(--text-muted); margin: 0;">Quản lý các chiến dịch quảng cáo và hình ảnh nổi bật</p>
         </div>
-        <button class="btn btn-primary-fashion">
+        <button class="btn btn-primary-fashion" @onclick="ShowCreateModal">
             <i class="fa-solid fa-cloud-arrow-up me-2"></i> Tải lên Banner mới
         </button>
     </div>
 
-    <div class="row g-4">
-        @foreach (var b in Banners)
-        {
-            <div class="col-md-6">
-                <div class="glass-card banner-item-card">
-                    <div class="banner-preview">
-                        <img src="@b.ImageUrl" />
-                        <div class="banner-status-overlay">
-                            <span class="status-badge" style="background: @(b.IsActive ? "var(--white)" : "#ffeb3b"); color: var(--text-main);">
-                                <i class="fa-solid @(b.IsActive ? "fa-eye" : "fa-eye-slash") me-1"></i>
-                                @(b.IsActive ? "Đang hoạt động" : "Bản nháp")
-                            </span>
+    @if (isLoading)
+    {
+        <div class="glass-card p-5 text-center">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-3 text-muted">Đang tải danh sách banner...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i>
+            @errorMessage
+            <button class="btn btn-sm btn-outline-danger ms-3" @onclick="LoadBanners">Thử lại</button>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            @foreach (var b in banners)
+            {
+                <div class="col-md-6">
+                    <div class="glass-card banner-item-card">
+                        <div class="banner-preview">
+                            <img src="@b.ImageUrl" alt="@b.Title" />
+                            <div class="banner-status-overlay">
+                                <span class="status-badge" style="background: @(b.IsActive ? "var(--white)" : "#ffeb3b"); color: var(--text-main);">
+                                    <i class="fa-solid @(b.IsActive ? "fa-eye" : "fa-eye-slash") me-1"></i>
+                                    @(b.IsActive ? "Đang hoạt động" : "Bản nháp")
+                                </span>
+                            </div>
                         </div>
-                    </div>
-                    <div class="p-4">
-                        <h4 style="font-weight: 800; color: var(--text-main); margin-bottom: 0.5rem;">@b.Title</h4>
-                        <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.5rem;">@b.SubTitle</p>
-                        
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span style="font-size: 0.85rem; color: var(--text-muted);">Cập nhật: 2 ngày trước</span>
-                            <div class="action-buttons">
-                                <button class="btn-action edit"><i class="fa-solid fa-pencil"></i></button>
-                                <button class="btn-action delete"><i class="fa-solid fa-trash"></i></button>
+                        <div class="p-4">
+                            <h4 style="font-weight: 800; color: var(--text-main); margin-bottom: 0.5rem;">@b.Title</h4>
+                            <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.5rem;">@b.SubTitle</p>
+                            
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" checked="@b.IsActive" @onchange="() => ToggleBannerStatus(b)">
+                                    <label class="form-check-label">@(b.IsActive ? "Hiển thị" : "Ẩn")</label>
+                                </div>
+                                <div class="action-buttons">
+                                    <button class="btn-action edit" @onclick="() => ShowEditModal(b)"><i class="fa-solid fa-pencil"></i></button>
+                                    <button class="btn-action delete" @onclick="() => ConfirmDelete(b)"><i class="fa-solid fa-trash"></i></button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        }
-    </div>
+            }
+
+            @if (!banners.Any())
+            {
+                <div class="col-12">
+                    <div class="glass-card p-5 text-center">
+                        <i class="fa-solid fa-image" style="font-size: 3rem; color: var(--text-muted);"></i>
+                        <p class="mt-3 text-muted">Chưa có banner nào</p>
+                    </div>
+                </div>
+            }
+        </div>
+    }
 </div>
+
+@* Modal Form *@
+@if (showModal)
+{
+    <div class="modal-overlay" @onclick="CloseModal">
+        <div class="modal-dialog-custom" @onclick:stopPropagation>
+            <div class="modal-header-custom">
+                <h4><i class="fa-solid fa-@(isEditMode ? "pencil" : "plus") me-2"></i>@(isEditMode ? "Chỉnh sửa" : "Thêm") banner</h4>
+                <button class="btn-close-custom" @onclick="CloseModal">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <div class="form-group mb-3">
+                    <label class="form-label-custom">Tiêu đề</label>
+                    <input type="text" class="form-control-custom" @bind="formData.Title" placeholder="Nhập tiêu đề banner" />
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label class="form-label-custom">Tiêu đề phụ</label>
+                    <input type="text" class="form-control-custom" @bind="formData.SubTitle" placeholder="Nhập tiêu đề phụ" />
+                </div>
+
+                <div class="form-group mb-3">
+                    <label class="form-label-custom">Hình ảnh banner</label>
+                    <ul class="nav nav-pills mb-3" style="background: #f1f5f9; padding: 5px; border-radius: 10px;">
+                        <li class="nav-item" style="flex: 1;">
+                            <button class="nav-link w-100 @(imageInputMode == "upload" ? "active" : "")" 
+                                    style='font-size: 0.8rem; font-weight: 600; border-radius: 8px; color: @(imageInputMode == "upload" ? "white" : "#64748b");'
+                                    @onclick='() => imageInputMode = "upload"'>Tải lên</button>
+                        </li>
+                        <li class="nav-item" style="flex: 1;">
+                            <button class="nav-link w-100 @(imageInputMode == "url" ? "active" : "")" 
+                                    style='font-size: 0.8rem; font-weight: 600; border-radius: 8px; color: @(imageInputMode == "url" ? "white" : "#64748b");'
+                                    @onclick='() => imageInputMode = "url"'>Nhập URL</button>
+                        </li>
+                    </ul>
+
+                    @if (imageInputMode == "upload")
+                    {
+                        <ImageUploadComponent @bind-ImageUrl="formData.ImageUrl" />
+                    }
+                    else
+                    {
+                        <input type="text" class="form-control-custom" @bind="formData.ImageUrl" placeholder="https://example.com/banner.jpg" />
+                    }
+                </div>
+
+                <div class="form-group mb-3">
+                    <label class="form-label-custom">Link URL (tùy chọn)</label>
+                    <input type="text" class="form-control-custom" @bind="formData.LinkUrl" placeholder="https://example.com/promotion" />
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label-custom">Thứ tự hiển thị</label>
+                        <input type="number" class="form-control-custom" @bind="formData.DisplayOrder" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label-custom">Trạng thái</label>
+                        <select class="form-control-custom" @bind="formData.IsActive">
+                            <option value="true">Hiển thị</option>
+                            <option value="false">Ẩn</option>
+                        </select>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(formError))
+                {
+                    <div class="alert alert-danger">@formError</div>
+                }
+            </div>
+            <div class="modal-footer-custom">
+                <button class="btn btn-secondary-custom" @onclick="CloseModal">Hủy</button>
+                <button class="btn btn-primary-custom" @onclick="SaveBanner" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    else
+                    {
+                        <i class="fa-solid fa-save me-2"></i>
+                    }
+                    Lưu
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* Delete Confirmation *@
+@if (showDeleteConfirm && bannerToDelete != null)
+{
+    <div class="modal-overlay" @onclick="CancelDelete">
+        <div class="modal-dialog-custom confirm-dialog" @onclick:stopPropagation>
+            <div class="modal-header-custom">
+                <h4><i class="fa-solid fa-trash me-2 text-danger"></i>Xác nhận xóa</h4>
+                <button class="btn-close-custom" @onclick="CancelDelete">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <p>Bạn có chắc chắn muốn xóa banner <strong>@bannerToDelete.Title</strong>?</p>
+            </div>
+            <div class="modal-footer-custom">
+                <button class="btn btn-secondary-custom" @onclick="CancelDelete">Hủy</button>
+                <button class="btn btn-danger-custom" @onclick="DeleteBanner" disabled="@isDeleting">
+                    @if (isDeleting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Xóa
+                </button>
+            </div>
+        </div>
+    </div>
+}
 
 <style>
     .banner-item-card {
@@ -75,16 +223,231 @@
 
     .banner-item-card .status-badge {
         box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        padding: 0.4rem 1rem;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 0.8rem;
+        display: inline-flex;
+        align-items: center;
     }
 </style>
 
 @code {
-    private List<BannerItem> Banners = new()
-    {
-        new("Bộ sưu tập Mùa Xuân 2024", "Khám phá phong cách nhẹ nhàng và sang trọng", "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=800&fit=crop", true),
-        new("Xu hướng Denim 2024", "Cá tính và mạnh mẽ với chất liệu Jean bền bỉ", "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=800&fit=crop", true),
-        new("Thời trang Công sở", "Lịch lãm cho quý ông hiện đại", "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=800&fit=crop", false)
-    };
+    private List<BannerDto> banners = new();
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
 
-    public record BannerItem(string Title, string SubTitle, string ImageUrl, bool IsActive);
+    // Modal state
+    private bool showModal = false;
+    private bool isEditMode = false;
+    private bool isSaving = false;
+    private string formError = string.Empty;
+    private BannerDto? editingBanner = null;
+    
+    // Delete confirmation
+    private bool showDeleteConfirm = false;
+    private bool isDeleting = false;
+    private string imageInputMode = "upload";
+    private BannerDto? bannerToDelete = null;
+
+    private void ResetForm()
+    {
+        formData = new BannerFormData();
+        imageInputMode = "upload";
+        formError = string.Empty;
+    }
+
+    private class BannerFormData
+    {
+        public string Title { get; set; } = string.Empty;
+        public string? SubTitle { get; set; }
+        public string ImageUrl { get; set; } = string.Empty;
+        public string? LinkUrl { get; set; }
+        public bool IsActive { get; set; } = true;
+        public int DisplayOrder { get; set; }
+    }
+
+    private BannerFormData formData = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBanners();
+    }
+
+    private async Task LoadBanners()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        try
+        {
+            banners = await BannerService.GetBannersAsync();
+            banners = banners.OrderBy(b => b.DisplayOrder).ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi tải danh sách banner: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowCreateModal()
+    {
+        isEditMode = false;
+        editingBanner = null;
+        ResetForm();
+        showModal = true;
+    }
+
+    private void ShowEditModal(BannerDto banner)
+    {
+        isEditMode = true;
+        editingBanner = banner;
+        formData = new BannerFormData
+        {
+            Title = banner.Title,
+            SubTitle = banner.SubTitle,
+            ImageUrl = banner.ImageUrl,
+            LinkUrl = banner.LinkUrl,
+            IsActive = banner.IsActive,
+            DisplayOrder = banner.DisplayOrder
+        };
+        imageInputMode = banner.ImageUrl?.StartsWith("http") == true ? "url" : "upload";
+        formError = string.Empty;
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        formError = string.Empty;
+    }
+
+    private async Task SaveBanner()
+    {
+        if (string.IsNullOrWhiteSpace(formData.Title))
+        {
+            formError = "Vui lòng nhập tiêu đề";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(formData.ImageUrl))
+        {
+            formError = "Vui lòng nhập URL hình ảnh";
+            return;
+        }
+
+        isSaving = true;
+        formError = string.Empty;
+
+        try
+        {
+            var dto = new CreateBannerDto(
+                formData.Title,
+                formData.SubTitle,
+                formData.ImageUrl,
+                formData.LinkUrl,
+                formData.IsActive,
+                formData.DisplayOrder
+            );
+
+            if (isEditMode && editingBanner != null)
+            {
+                var success = await BannerService.UpdateBannerAsync(editingBanner.Id, dto);
+                if (success)
+                {
+                    await LoadBanners();
+                    CloseModal();
+                }
+                else
+                {
+                    formError = "Lỗi cập nhật banner";
+                }
+            }
+            else
+            {
+                var result = await BannerService.CreateBannerAsync(dto);
+                if (result != null)
+                {
+                    await LoadBanners();
+                    CloseModal();
+                }
+                else
+                {
+                    formError = "Lỗi tạo banner";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            formError = $"Lỗi: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ToggleBannerStatus(BannerDto banner)
+    {
+        try
+        {
+            var dto = new CreateBannerDto(
+                banner.Title,
+                banner.SubTitle,
+                banner.ImageUrl,
+                banner.LinkUrl,
+                !banner.IsActive,
+                banner.DisplayOrder
+            );
+            await BannerService.UpdateBannerAsync(banner.Id, dto);
+            await LoadBanners();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi cập nhật trạng thái: {ex.Message}";
+        }
+    }
+
+    private void ConfirmDelete(BannerDto banner)
+    {
+        bannerToDelete = banner;
+        showDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+        bannerToDelete = null;
+    }
+
+    private async Task DeleteBanner()
+    {
+        if (bannerToDelete == null) return;
+
+        isDeleting = true;
+        try
+        {
+            var success = await BannerService.DeleteBannerAsync(bannerToDelete.Id);
+            if (success)
+            {
+                await LoadBanners();
+                CancelDelete();
+            }
+            else
+            {
+                errorMessage = "Lỗi xóa banner";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi: {ex.Message}";
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
 }

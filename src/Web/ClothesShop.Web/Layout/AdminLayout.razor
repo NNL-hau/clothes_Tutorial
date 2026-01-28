@@ -24,6 +24,10 @@
                     <i class="fa-solid fa-shirt"></i>
                     <span>Sản phẩm</span>
                 </NavLink>
+                <NavLink class="nav-link-custom" href="/admin/categories">
+                    <i class="fa-solid fa-layer-group"></i>
+                    <span>Danh mục</span>
+                </NavLink>
                 <NavLink class="nav-link-custom" href="/admin/orders">
                     <i class="fa-solid fa-truck-fast"></i>
                     <span>Đơn hàng</span>
@@ -70,13 +74,46 @@
         <header class="top-bar">
             <div class="search-box">
                 <i class="fa-solid fa-magnifying-glass" style="color: #94a3b8;"></i>
-                <input type="text" placeholder="Tìm nhanh..." />
+                <input type="text" placeholder="Tìm nhanh sản phẩm, đơn hàng..." 
+                       @bind="SearchQuery" 
+                       @onkeyup="HandleSearch" />
             </div>
 
             <div class="top-actions">
-                <div style="position: relative; cursor: pointer;">
+                <div class="notification-trigger" @onclick="ToggleNotifications">
                     <i class="fa-regular fa-bell" style="font-size: 1.2rem; color: #64748b;"></i>
-                    <span style="position: absolute; top: -4px; right: -4px; background: #ef4444; width: 7px; height: 7px; border-radius: 50%;"></span>
+                    @if (UnreadCount > 0)
+                    {
+                        <span class="notification-badge">@UnreadCount</span>
+                    }
+
+                    @if (showNotifications)
+                    {
+                        <div class="notification-dropdown" @onclick:stopPropagation>
+                            <div class="dropdown-header">
+                                <span>Thông báo mới</span>
+                                <span class="mark-read" @onclick="MarkAllAsRead">Đánh dấu đã đọc</span>
+                            </div>
+                            <div class="dropdown-body">
+                                @if (!Notifications.Any())
+                                {
+                                    <div class="p-4 text-center text-muted">Không có thông báo mới</div>
+                                }
+                                @foreach (var n in Notifications)
+                                {
+                                    <div class="notification-item @(n.IsNew ? "new" : "")">
+                                        <div class="note-icon @n.Type">
+                                            <i class="@n.Icon"></i>
+                                        </div>
+                                        <div class="note-content">
+                                            <div class="note-title">@n.Title</div>
+                                            <div class="note-desc">@n.Description</div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
                 </div>
                 
                 <div class="user-profile">
@@ -96,3 +133,172 @@
         </div>
     </main>
 </div>
+
+@implements IDisposable
+@inject IOrderApiService OrderService
+@inject IReviewApiService ReviewService
+@inject IProductApiService ProductService
+@using ClothesShop.Web.Models
+
+@code {
+    private string SearchQuery { get; set; } = string.Empty;
+    private bool showNotifications = false;
+    private List<DashboardNote> Notifications = new();
+    private int UnreadCount => Notifications.Count(n => n.IsNew);
+
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadNotifications();
+    }
+
+    private void HandleSearch(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            Navigation.NavigateTo($"/admin/search?q={Uri.EscapeDataString(SearchQuery)}");
+            SearchQuery = string.Empty;
+        }
+    }
+
+    private async Task LoadNotifications()
+    {
+        try
+        {
+            var orders = await OrderService.GetOrdersAsync();
+            var reviews = await ReviewService.GetReviewsAsync();
+            var products = await ProductService.GetProductsAsync();
+
+            Notifications.Clear();
+            
+            // New orders (last 24h)
+            foreach (var o in orders.Where(o => o.CreatedAt > DateTime.Now.AddDays(-1)).OrderByDescending(o => o.CreatedAt).Take(3))
+            {
+                Notifications.Add(new($"Đơn hàng mới #{o.Id.ToString().Substring(0,4)}", $"{o.UserName} - {o.TotalPrice:N0}₫", "order", "fa-solid fa-shopping-cart", true));
+            }
+
+            // Pending reviews
+            foreach (var r in reviews.Where(r => !r.IsApproved).OrderByDescending(r => r.CreatedAt).Take(2))
+            {
+                Notifications.Add(new($"Bình luận chờ duyệt", $"{r.UserName}: {r.Comment}", "review", "fa-solid fa-comment", true));
+            }
+
+            // High stock warnings
+            foreach (var p in products.Where(p => p.StockQuantity > 0 && p.StockQuantity < 5).Take(2))
+            {
+                Notifications.Add(new($"Sắp hết hàng: {p.Name}", $"Chỉ còn {p.StockQuantity} sản phẩm", "warn", "fa-solid fa-exclamation-triangle", true));
+            }
+
+            StateHasChanged();
+        }
+        catch { }
+    }
+
+    private void ToggleNotifications() => showNotifications = !showNotifications;
+    private void MarkAllAsRead() => Notifications.ForEach(n => n.IsNew = false);
+
+    public record DashboardNote(string Title, string Description, string Type, string Icon, bool IsNew = false)
+    {
+        public bool IsNew { get; set; } = IsNew;
+    }
+
+    public void Dispose() { }
+}
+
+<style>
+    .notification-trigger {
+        position: relative;
+        cursor: pointer;
+        padding: 5px;
+    }
+
+    .notification-badge {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background: #ef4444;
+        color: white;
+        font-size: 0.65rem;
+        font-weight: 800;
+        min-width: 16px;
+        height: 16px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid white;
+    }
+
+    .notification-dropdown {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        width: 320px;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        z-index: 1000;
+        margin-top: 15px;
+        overflow: hidden;
+        border: 1px solid #f1f5f9;
+        cursor: default;
+    }
+
+    .dropdown-header {
+        padding: 1rem 1.2rem;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 700;
+        font-size: 0.9rem;
+    }
+
+    .mark-read {
+        font-size: 0.75rem;
+        color: var(--primary-color);
+        cursor: pointer;
+        font-weight: 600;
+    }
+
+    .dropdown-body {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .notification-item {
+        padding: 1rem 1.2rem;
+        display: flex;
+        gap: 1rem;
+        transition: background 0.2s;
+        border-bottom: 1px solid #f8fafc;
+    }
+
+    .notification-item:hover {
+        background: #f8fafc;
+    }
+
+    .notification-item.new {
+        background: #f0f9ff;
+    }
+
+    .note-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .note-icon.order { background: #ecfdf5; color: #10b981; }
+    .note-icon.review { background: #eff6ff; color: #3b82f6; }
+    .note-icon.warn { background: #fff7ed; color: #f97316; }
+
+    .note-content { flex: 1; }
+    .note-title { font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-bottom: 0.1rem; }
+    .note-desc { font-size: 0.75rem; color: #64748b; line-height: 1.4; }
+</style>
+

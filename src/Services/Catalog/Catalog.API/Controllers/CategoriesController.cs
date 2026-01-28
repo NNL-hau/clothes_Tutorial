@@ -33,5 +33,29 @@ namespace Catalog.API.Controllers
             await _context.SaveChangesAsync();
             return CreatedAtAction(nameof(GetCategories), new { }, new CategoryDto(category.Id, category.Name, category.Description));
         }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateCategory(Guid id, CreateCategoryDto dto)
+        {
+            var category = await _context.Categories.FindAsync(id);
+            if (category == null) return NotFound();
+
+            category.Name = dto.Name;
+            category.Description = dto.Description;
+
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteCategory(Guid id)
+        {
+            var category = await _context.Categories.FindAsync(id);
+            if (category == null) return NotFound();
+
+            _context.Categories.Remove(category);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
     }
 }
