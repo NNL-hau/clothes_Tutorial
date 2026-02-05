@@ -1,0 +1,82 @@
+@using ClothesShop.Web.Models
+@using ClothesShop.Web.Services
+@inject IProductApiService ProductService
+
+<div class="product-list-section">
+    <div class="section-header">
+        <h2>@Title</h2>
+    </div>
+    
+    @if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <p>Đang tải sản phẩm...</p>
+        </div>
+    }
+    else if (products.Count == 0)
+    {
+        <div class="empty-state">
+            <p>Chưa có sản phẩm nào</p>
+        </div>
+    }
+    else
+    {
+        <div class="products-grid">
+            @foreach (var product in products.Take(DisplayCount))
+            {
+                <ProductCard Product="@product" />
+            }
+        </div>
+        
+        @if (products.Count > DisplayCount)
+        {
+            <div class="load-more-container">
+                <button class="btn-load-more" @onclick="LoadMore">
+                    Xem thêm sản phẩm
+                </button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = "Danh Sách Sản Phẩm";
+    
+    [Parameter]
+    public int InitialCount { get; set; } = 12;
+    
+    private List<ProductDto> products = new();
+    private int DisplayCount { get; set; }
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        DisplayCount = InitialCount;
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        isLoading = true;
+        try
+        {
+            products = await ProductService.GetProductsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading products: {ex.Message}");
+            // TODO: Show error message to user
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void LoadMore()
+    {
+        DisplayCount += 12;
+    }
+}

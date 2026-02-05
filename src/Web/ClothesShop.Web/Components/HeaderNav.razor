@@ -1,0 +1,94 @@
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+@using ClothesShop.Web.Services
+
+<header class="main-header">
+    <div class="header-container">
+        <div class="logo">
+            <a href="/">CANIFA•S</a>
+        </div>
+        
+        <nav class="main-nav">
+            <a href="/products?category=men" class="nav-item">ĐỒ NAM</a>
+            <a href="/products?category=women" class="nav-item">ĐỒ NỮ</a>
+            <a href="/products?category=uniform" class="nav-item">ĐỒNG PHỤC</a>
+        </nav>
+        
+        <div class="header-actions">
+            @if (isAuthenticated && currentUser != null)
+            {
+                <div class="account-dropdown">
+                    <div class="account-trigger" @onclick="ToggleDropdown" @onclick:stopPropagation>
+                        <i class="fa-solid fa-circle-user"></i>
+                        <span class="account-name">@currentUser.FullName</span>
+                        <i class="fa-solid fa-chevron-down ms-1" style="font-size: 0.7rem;"></i>
+                    </div>
+                    
+                    @if (showDropdown)
+                    {
+                        <div class="dropdown-menu" @onclick:stopPropagation>
+                            <div class="dropdown-header">
+                                <strong style="color: #333 !important;">@currentUser.FullName</strong>
+                                <small style="color: #666 !important;">@currentUser.Email</small>
+                            </div>
+                            <div style="height: 1px; background: #eee; margin: 5px 0;"></div>
+                            <button class="dropdown-item logout-btn" @onclick="HandleLogout" style="display: flex !important; width: 100% !important;">
+                                <i class="fa-solid fa-right-from-bracket me-2"></i>
+                                <span>Đăng xuất</span>
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <a href="/login" class="account-link">
+                    <i class="fa-solid fa-circle-user"></i>
+                    <span>Tài khoản</span>
+                </a>
+            }
+            
+            <a href="/cart" class="cart-link">
+                <i class="fa-solid fa-cart-shopping"></i>
+                <span>Giỏ hàng</span>
+                @if (cartCount > 0)
+                {
+                    <span class="cart-badge">@cartCount</span>
+                }
+            </a>
+        </div>
+    </div>
+</header>
+
+@code {
+    private bool isAuthenticated = false;
+    private Models.UserInfo? currentUser = null;
+    private bool showDropdown = false;
+    private int cartCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await AuthService.IsAuthenticatedAsync();
+        
+        if (isAuthenticated)
+        {
+            currentUser = await AuthService.GetCurrentUserAsync();
+        }
+        
+        // TODO: Get cart count from CartService
+        cartCount = 0;
+    }
+
+    private void ToggleDropdown()
+    {
+        Console.WriteLine($"[HeaderNav] ToggleDropdown called. Current: {showDropdown} -> {!showDropdown}");
+        showDropdown = !showDropdown;
+        StateHasChanged();
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/", true);
+    }
+}

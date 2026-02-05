@@ -1,0 +1,125 @@
+@using ClothesShop.Web.Models
+@using ClothesShop.Web.Services
+@inject IBannerApiService BannerService
+@implements IDisposable
+
+<div class="banner-carousel">
+    @if (isLoading)
+    {
+        <div class="carousel-container loading">
+            <div class="spinner-border text-primary" role="status"></div>
+        </div>
+    }
+    else if (banners.Any())
+    {
+        <div class="carousel-container">
+            @foreach (var (banner, index) in banners.Select((b, i) => (b, i)))
+            {
+                <div class="carousel-slide @(index == currentSlide ? "active" : "")"
+                     style="background-image: url('@banner.ImageUrl');">
+                    <div class="slide-content">
+                        <h2>@banner.Title</h2>
+                        @if (!string.IsNullOrEmpty(banner.SubTitle))
+                        {
+                            <p>@banner.SubTitle</p>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+        
+        @if (banners.Count > 1)
+        {
+            <button class="carousel-arrow prev" @onclick="PreviousSlide">
+                <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <button class="carousel-arrow next" @onclick="NextSlide">
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
+            
+            <div class="carousel-dots">
+                @for (int i = 0; i < banners.Count; i++)
+                {
+                    var slideIndex = i;
+                    <button class="dot @(currentSlide == slideIndex ? "active" : "")"
+                            @onclick="() => GoToSlide(slideIndex)"></button>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<BannerDto> banners = new();
+    private int currentSlide = 0;
+    private System.Threading.Timer? autoPlayTimer;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBanners();
+        StartAutoPlay();
+    }
+
+    private async Task LoadBanners()
+    {
+        isLoading = true;
+        try
+        {
+            var allBanners = await BannerService.GetBannersAsync();
+            banners = allBanners
+                .Where(b => b.IsActive)
+                .OrderBy(b => b.DisplayOrder)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading banners: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void StartAutoPlay()
+    {
+        autoPlayTimer = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(() =>
+            {
+                if (banners.Count > 1)
+                {
+                    NextSlide();
+                    StateHasChanged();
+                }
+            });
+        }, null, 5000, 5000);
+    }
+
+    private void NextSlide()
+    {
+        if (banners.Any())
+        {
+            currentSlide = (currentSlide + 1) % banners.Count;
+        }
+    }
+
+    private void PreviousSlide()
+    {
+        if (banners.Any())
+        {
+            currentSlide = currentSlide == 0 ? banners.Count - 1 : currentSlide - 1;
+        }
+    }
+
+    private void GoToSlide(int index)
+    {
+        currentSlide = index;
+    }
+
+    public void Dispose()
+    {
+        autoPlayTimer?.Dispose();
+    }
+}
