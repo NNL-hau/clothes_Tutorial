@@ -1,0 +1,28 @@
+﻿@inherits LayoutComponentBase
+
+<div class="page">
+    <HeaderNav />
+    
+    <main>
+        <article class="content">
+            @Body
+        </article>
+    </main>
+</div>
+
+<style>
+    .page {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    main {
+        flex: 1;
+    }
+    
+    .content {
+        background: #fafafa;
+    }
+</style>
+

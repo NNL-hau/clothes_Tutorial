@@ -1,0 +1,33 @@
+@using ClothesShop.Web.Models
+
+<div class="product-card">
+    <a href="/products/@Product.Id" class="card-link">
+        <div class="product-image">
+            <img src="@(string.IsNullOrEmpty(Product.ImageUrl) ? "/images/placeholder-product.jpg" : Product.ImageUrl)" 
+                 alt="@Product.Name" />
+            @if (Product.StockQuantity == 0)
+            {
+                <div class="badge out-of-stock">Hết hàng</div>
+            }
+            else if (IsNew)
+            {
+                <div class="badge new">New</div>
+            }
+        </div>
+        
+        <div class="product-info">
+            <h3 class="product-name">@Product.Name</h3>
+            
+            <div class="product-price">
+                <span class="current-price">@Product.Price.ToString("N0") đ</span>
+            </div>
+        </div>
+    </a>
+</div>
+
+@code {
+    [Parameter]
+    public ProductDto Product { get; set; } = null!;
+    
+    private bool IsNew => (DateTime.Now - Product.CreatedAt).TotalDays <= 30;
+}

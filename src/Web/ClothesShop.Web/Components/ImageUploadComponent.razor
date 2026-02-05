@@ -1,0 +1,232 @@
+@inject IJSRuntime JS
+@inject IHttpClientFactory HttpClientFactory
+
+<div class="image-upload-wrapper">
+    <InputFile OnChange="HandleFileSelected" accept="image/*" class="d-none" id="@inputId" />
+    
+    @if (!string.IsNullOrEmpty(ImageUrl))
+    {
+        <div class="image-preview-box">
+            <img src="@ImageUrl" alt="Preview" />
+            <button type="button" class="btn-remove-image" @onclick="RemoveImage" title="Xóa ảnh">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+    }
+    else
+    {
+        <label for="@inputId" class="upload-drop-zone">
+            <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+            <div class="upload-text">
+                <strong>Click để chọn ảnh</strong>
+                <small>hoặc kéo thả file vào đây</small>
+            </div>
+            <div class="upload-hint">JPG, PNG, GIF, WEBP (tối đa 5MB)</div>
+        </label>
+    }
+    
+    @if (isUploading)
+    {
+        <div class="upload-progress-overlay">
+            <div class="spinner-border text-primary"></div>
+            <span class="ms-2">Đang tải ảnh lên...</span>
+        </div>
+    }
+    
+    @if (!string.IsNullOrEmpty(uploadError))
+    {
+        <div class="alert alert-danger alert-sm mt-2">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i>
+            @uploadError
+        </div>
+    }
+</div>
+
+<style>
+    .image-upload-wrapper {
+        position: relative;
+    }
+
+    .upload-drop-zone {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2.5rem 1.5rem;
+        border: 2px dashed #cbd5e1;
+        border-radius: 16px;
+        background: #f8fafc;
+        cursor: pointer;
+        transition: var(--transition);
+        text-align: center;
+    }
+
+    .upload-drop-zone:hover {
+        border-color: var(--primary-color);
+        background: var(--primary-light);
+    }
+
+    .upload-icon {
+        font-size: 3rem;
+        color: var(--primary-color);
+        margin-bottom: 1rem;
+    }
+
+    .upload-text strong {
+        display: block;
+        color: var(--text-main);
+        font-size: 1rem;
+        margin-bottom: 0.3rem;
+    }
+
+    .upload-text small {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+    }
+
+    .upload-hint {
+        margin-top: 0.8rem;
+        color: var(--text-muted);
+        font-size: 0.75rem;
+    }
+
+    .image-preview-box {
+        position: relative;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 2px solid #e2e8f0;
+        background: #f8fafc;
+    }
+
+    .image-preview-box img {
+        width: 100%;
+        max-height: 300px;
+        object-fit: contain;
+        display: block;
+    }
+
+    .btn-remove-image {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: rgba(239, 68, 68, 0.95);
+        color: white;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: var(--transition);
+    }
+
+    .btn-remove-image:hover {
+        background: #dc2626;
+        transform: scale(1.1);
+    }
+
+    .upload-progress-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.95);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 16px;
+        backdrop-filter: blur(4px);
+    }
+
+    .alert-sm {
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+    }
+</style>
+
+@code {
+    [Parameter] public string ImageUrl { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> ImageUrlChanged { get; set; }
+    [Parameter] public string? UploadEndpoint { get; set; } = "http://localhost:5002/api/upload";
+
+    private string inputId = Guid.NewGuid().ToString();
+    private bool isUploading;
+    private string uploadError = string.Empty;
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        uploadError = string.Empty;
+        isUploading = true;
+
+        try
+        {
+            var file = e.File;
+            
+            // Validate file size (5MB max)
+            const long maxFileSize = 5 * 1024 * 1024;
+            if (file.Size > maxFileSize)
+            {
+                throw new Exception("File quá lớn. Kích thước tối đa: 5MB");
+            }
+
+            // Validate file type
+            var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+            if (!allowedTypes.Contains(file.ContentType))
+            {
+                throw new Exception("Định dạng file không được hỗ trợ. Chỉ chấp nhận: JPG, PNG, GIF, WEBP");
+            }
+
+            // Upload to server
+            var url = await UploadFileAsync(file);
+            if (!string.IsNullOrEmpty(url))
+            {
+                ImageUrl = url;
+                await ImageUrlChanged.InvokeAsync(url);
+            }
+        }
+        catch (Exception ex)
+        {
+            uploadError = ex.Message;
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    private async Task<string?> UploadFileAsync(IBrowserFile file)
+    {
+        using var content = new MultipartFormDataContent();
+        
+        var fileContent = new StreamContent(file.OpenReadStream(5 * 1024 * 1024));
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+        
+        content.Add(fileContent, "file", file.Name);
+
+        var httpClient = HttpClientFactory.CreateClient("CatalogApi");
+        var response = await httpClient.PostAsync("/api/upload", content);
+        
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<UploadResult>();
+            return result?.Url;
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Upload failed: {error}");
+        }
+    }
+
+    private async Task RemoveImage()
+    {
+        ImageUrl = string.Empty;
+        await ImageUrlChanged.InvokeAsync(string.Empty);
+        uploadError = string.Empty;
+    }
+
+    private record UploadResult(string Url);
+}

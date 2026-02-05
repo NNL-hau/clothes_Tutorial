@@ -1,0 +1,321 @@
+@page "/admin/categories"
+@layout AdminLayout
+@inherits AuthorizedPageBase
+@inject ICategoryApiService CategoryService
+@using ClothesShop.Web.Models
+
+<div class="admin-categories">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <div>
+            <h2 style="font-weight: 800; color: var(--text-main); font-size: 2rem; margin: 0;">Quản lý Danh mục</h2>
+            <p style="color: var(--text-muted); margin: 0;">Quản lý các nhóm sản phẩm trong hệ thống</p>
+        </div>
+        <button class="btn btn-primary-fashion" @onclick="ShowCreateModal">
+            <i class="fa-solid fa-plus me-2"></i> Thêm danh mục mới
+        </button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="glass-card p-5 text-center">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-3 text-muted">Đang tải danh sách danh mục...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i>
+            @errorMessage
+            <button class="btn btn-sm btn-outline-danger ms-3" @onclick="LoadCategories">Thử lại</button>
+        </div>
+    }
+    else
+    {
+        <div class="glass-card p-4">
+            <div class="table-container">
+                <table class="table-fashion">
+                    <thead>
+                        <tr>
+                            <th>Tên danh mục</th>
+                            <th>Mô tả</th>
+                            <th class="text-center">Số lượng SP</th>
+                            <th class="text-center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var cat in categories)
+                        {
+                            <tr>
+                                <td><strong style="color: var(--text-main);">@cat.Name</strong></td>
+                                <td><span class="text-muted">@(string.IsNullOrEmpty(cat.Description) ? "Không có mô tả" : cat.Description)</span></td>
+                                <td class="text-center"><span class="badge bg-light text-dark">@GetProductCount(cat.Id)</span></td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-action edit" @onclick="() => ShowEditModal(cat)" title="Sửa">
+                                            <i class="fa-solid fa-pen-to-square"></i>
+                                        </button>
+                                        <button class="btn-action delete" @onclick="() => ConfirmDelete(cat)" title="Xóa">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                @if (!categories.Any())
+                {
+                    <div class="text-center py-5">
+                        <i class="fa-solid fa-layer-group" style="font-size: 3rem; color: var(--text-muted);"></i>
+                        <p class="mt-3 text-muted">Chưa có danh mục nào</p>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@* Modal Form *@
+@if (showModal)
+{
+    <div class="modal-overlay" @onclick="CloseModal">
+        <div class="modal-dialog-custom" @onclick:stopPropagation>
+            <div class="modal-header-custom">
+                <h4><i class="fa-solid fa-@(isEditMode ? "pen-to-square" : "plus") me-2"></i>@(isEditMode ? "Chỉnh sửa" : "Thêm") danh mục</h4>
+                <button class="btn-close-custom" @onclick="CloseModal">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <div class="form-group mb-3">
+                    <label class="form-label-custom">Tên danh mục <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control-custom" @bind="formData.Name" placeholder="Ví dụ: Áo sơ mi nam" />
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label class="form-label-custom">Mô tả</label>
+                    <textarea class="form-control-custom" @bind="formData.Description" rows="3" placeholder="Nhập mô tả ngắn"></textarea>
+                </div>
+
+                @if (!string.IsNullOrEmpty(formError))
+                {
+                    <div class="alert alert-danger">@formError</div>
+                }
+            </div>
+            <div class="modal-footer-custom">
+                <button class="btn btn-secondary-custom" @onclick="CloseModal">Hủy</button>
+                <button class="btn btn-primary-custom" @onclick="SaveCategory" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Lưu danh mục
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* Delete Confirmation *@
+@if (showDeleteConfirm && categoryToDelete != null)
+{
+    <div class="modal-overlay" @onclick="CancelDelete">
+        <div class="modal-dialog-custom confirm-dialog" @onclick:stopPropagation>
+            <div class="modal-header-custom">
+                <h4><i class="fa-solid fa-trash-can me-2 text-danger"></i>Xác nhận xóa</h4>
+                <button class="btn-close-custom" @onclick="CancelDelete">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <p>Bạn có chắc muốn xóa danh mục <strong>@categoryToDelete.Name</strong>?</p>
+                <p class="text-muted small">Cảnh báo: Nếu có sản phẩm thuộc danh mục này, việc xóa có thể gây lỗi.</p>
+            </div>
+            <div class="modal-footer-custom">
+                <button class="btn btn-secondary-custom" @onclick="CancelDelete">Hủy</button>
+                <button class="btn btn-danger-custom" @onclick="DeleteCategory" disabled="@isDeleting">
+                    @if (isDeleting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Xóa
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@implements IDisposable
+@inject IProductApiService ProductService
+
+@code {
+    private List<CategoryDto> categories = new();
+    private List<ProductDto> products = new();
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+
+    // Modal state
+    private bool showModal = false;
+    private bool isEditMode = false;
+    private bool isSaving = false;
+    private string formError = string.Empty;
+    private CategoryDto? editingCategory = null;
+    private CategoryFormData formData = new();
+
+    private class CategoryFormData
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+    }
+
+    // Delete state
+    private bool showDeleteConfirm = false;
+    private bool isDeleting = false;
+    private CategoryDto? categoryToDelete = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        try
+        {
+            var catTask = CategoryService.GetCategoriesAsync();
+            var prodTask = ProductService.GetProductsAsync();
+            await Task.WhenAll(catTask, prodTask);
+            
+            categories = await catTask;
+            products = await prodTask;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi tải dữ liệu: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadCategories() => categories = await CategoryService.GetCategoriesAsync();
+
+    private int GetProductCount(Guid categoryId) => products.Count(p => p.CategoryId == categoryId);
+
+    private void ShowCreateModal()
+    {
+        isEditMode = false;
+        editingCategory = null;
+        formData = new CategoryFormData();
+        formError = string.Empty;
+        showModal = true;
+    }
+
+    private void ShowEditModal(CategoryDto category)
+    {
+        isEditMode = true;
+        editingCategory = category;
+        formData = new CategoryFormData
+        {
+            Name = category.Name,
+            Description = category.Description
+        };
+        formError = string.Empty;
+        showModal = true;
+    }
+
+    private void CloseModal() => showModal = false;
+
+    private async Task SaveCategory()
+    {
+        if (string.IsNullOrWhiteSpace(formData.Name))
+        {
+            formError = "Tên danh mục không được để trống";
+            return;
+        }
+
+        isSaving = true;
+        formError = string.Empty;
+        try
+        {
+            var dto = new CreateCategoryDto(formData.Name, formData.Description);
+            
+            if (isEditMode && editingCategory != null)
+            {
+                var success = await CategoryService.UpdateCategoryAsync(editingCategory.Id, dto);
+                if (success)
+                {
+                    await LoadCategories();
+                    CloseModal();
+                }
+                else
+                {
+                    formError = "Lỗi khi cập nhật danh mục";
+                }
+            }
+            else
+            {
+                var result = await CategoryService.CreateCategoryAsync(dto);
+                if (result != null)
+                {
+                    await LoadCategories();
+                    CloseModal();
+                }
+                else
+                {
+                    formError = "Lỗi khi lưu danh mục";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            formError = $"Lỗi: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    public void Dispose() { }
+
+    private void ConfirmDelete(CategoryDto category)
+    {
+        categoryToDelete = category;
+        showDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+        categoryToDelete = null;
+    }
+
+    private async Task DeleteCategory()
+    {
+        if (categoryToDelete == null) return;
+        isDeleting = true;
+        try
+        {
+            var success = await CategoryService.DeleteCategoryAsync(categoryToDelete.Id);
+            if (success)
+            {
+                await LoadCategories();
+                CancelDelete();
+            }
+            else
+            {
+                errorMessage = "Lỗi khi xóa danh mục. Có thể vẫn còn sản phẩm thuộc danh mục này.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi: {ex.Message}";
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+}

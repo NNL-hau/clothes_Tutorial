@@ -1,0 +1,301 @@
+@page "/admin/reviews"
+@layout AdminLayout
+@inherits AuthorizedPageBase
+@inject IReviewApiService ReviewService
+@inject IProductApiService ProductService
+@using ClothesShop.Web.Models
+
+<div class="admin-reviews">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <div>
+            <h2 style="font-weight: 800; color: var(--text-main); font-size: 2rem; margin: 0;">Quản lý Bình luận</h2>
+            <p style="color: var(--text-muted); margin: 0;">Kiểm duyệt và quản lý các đánh giá sản phẩm từ khách hàng</p>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="glass-card p-5 text-center">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-3 text-muted">Đang tải danh sách bình luận...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i>
+            @errorMessage
+            <button class="btn btn-sm btn-outline-danger ms-3" @onclick="LoadReviews">Thử lại</button>
+        </div>
+    }
+    else
+    {
+        <div class="glass-card p-4">
+            <div class="d-flex gap-3 mb-4">
+                <div class="search-box-premium" style="flex: 1;">
+                    <i class="fa-solid fa-magnifying-glass text-muted"></i>
+                    <input type="text" placeholder="Tìm tên người dùng, nội dung..." @bind-value="searchTerm" @bind-value:event="oninput" />
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="table-fashion">
+                    <thead>
+                        <tr>
+                            <th>Người dùng</th>
+                            <th>Sản phẩm</th>
+                            <th>Đánh giá</th>
+                            <th style="width: 300px;">Nội dung</th>
+                            <th>Trạng thái</th>
+                            <th>Ngày</th>
+                            <th class="text-center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in FilteredReviews)
+                        {
+                            <tr>
+                                <td>
+                                    <div style="font-weight: 700; color: var(--text-main);">@r.UserName</div>
+                                </td>
+                                <td>
+                                    <div style="font-size: 0.85rem; color: var(--primary-color);">@GetProductName(r.ProductId)</div>
+                                    <small class="text-muted">ID: @r.ProductId.ToString().Substring(0, 8)...</small>
+                                </td>
+                                <td>
+                                    <div class="rating-stars">
+                                        @for (int i = 1; i <= 5; i++)
+                                        {
+                                            <i class="fa-solid fa-star @(i <= r.Rating ? "text-warning" : "text-light-gray")"></i>
+                                        }
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="comment-text" title="@r.Comment">@r.Comment</div>
+                                </td>
+                                <td>
+                                    <span class="badge @(r.IsApproved ? "badge-success-premium" : "badge-warning-premium")">
+                                        @(r.IsApproved ? "Đã duyệt" : "Chờ duyệt")
+                                    </span>
+                                </td>
+                                <td>
+                                    <div style="color: var(--text-muted); font-size: 0.85rem;">@r.CreatedAt.ToString("dd/MM/yyyy HH:mm")</div>
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        @if (!r.IsApproved)
+                                        {
+                                            <button class="btn-action edit" title="Duyệt bình luận" @onclick="() => ApproveReview(r)">
+                                                <i class="fa-solid fa-check"></i>
+                                            </button>
+                                        }
+                                        <button class="btn-action delete" title="Xóa bình luận" @onclick="() => ConfirmDelete(r)">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                @if (!FilteredReviews.Any())
+                {
+                    <div class="text-center py-5">
+                        <i class="fa-solid fa-comments" style="font-size: 3rem; color: var(--text-muted);"></i>
+                        <p class="mt-3 text-muted">Không tìm thấy bình luận nào</p>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@* Delete Confirmation *@
+@if (showDeleteConfirm && reviewToDelete != null)
+{
+    <div class="modal-overlay" @onclick="CancelDelete">
+        <div class="modal-dialog-custom confirm-dialog" @onclick:stopPropagation>
+            <div class="modal-header-custom">
+                <h4><i class="fa-solid fa-triangle-exclamation me-2 text-danger"></i>Xác nhận xóa</h4>
+                <button class="btn-close-custom" @onclick="CancelDelete">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <p>Bạn có chắc chắn muốn xóa bình luận của <strong>@reviewToDelete.UserName</strong>?</p>
+                <p class="text-muted">Hành động này không thể hoàn tác.</p>
+            </div>
+            <div class="modal-footer-custom">
+                <button class="btn btn-secondary-custom" @onclick="CancelDelete">Hủy</button>
+                <button class="btn btn-danger-custom" @onclick="DeleteReview" disabled="@isActionInProgress">
+                    @if (isActionInProgress)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Xóa
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .rating-stars {
+        color: #e2e8f0;
+        font-size: 0.85rem;
+    }
+    .text-light-gray { color: #e2e8f0; }
+    
+    .comment-text {
+        max-width: 300px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 0.9rem;
+        color: var(--text-main);
+    }
+
+    .badge-success-premium {
+        background: #ecfdf5;
+        color: #10b981;
+        padding: 0.4rem 0.8rem;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.75rem;
+    }
+
+    .badge-warning-premium {
+        background: #fffbeb;
+        color: #d97706;
+        padding: 0.4rem 0.8rem;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.75rem;
+    }
+
+    .search-box-premium {
+        background: #f1f3f9;
+        border-radius: 14px;
+        padding: 0.8rem 1.2rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .search-box-premium input {
+        border: none;
+        outline: none;
+        background: transparent;
+        width: 100%;
+    }
+</style>
+
+@code {
+    private List<ReviewDto> reviews = new();
+    private List<ProductDto> products = new();
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private string searchTerm = string.Empty;
+    
+    private bool showDeleteConfirm = false;
+    private bool isActionInProgress = false;
+    private ReviewDto? reviewToDelete = null;
+
+    private IEnumerable<ReviewDto> FilteredReviews
+    {
+        get
+        {
+            var filtered = reviews.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                filtered = filtered.Where(r => 
+                    r.UserName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || 
+                    r.Comment.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+            }
+            return filtered.OrderByDescending(r => r.CreatedAt);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        try
+        {
+            var reviewsTask = ReviewService.GetReviewsAsync();
+            var productsTask = ProductService.GetProductsAsync();
+            
+            await Task.WhenAll(reviewsTask, productsTask);
+            
+            reviews = await reviewsTask;
+            products = await productsTask;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi tải dữ liệu: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadReviews() => await LoadData();
+
+    private string GetProductName(Guid productId)
+    {
+        return products.FirstOrDefault(p => p.Id == productId)?.Name ?? "Sản phẩm không tồn tại";
+    }
+
+    private async Task ApproveReview(ReviewDto review)
+    {
+        isActionInProgress = true;
+        try
+        {
+            var success = await ReviewService.ApproveReviewAsync(review.Id, true);
+            if (success)
+            {
+                await LoadReviews();
+            }
+        }
+        finally
+        {
+            isActionInProgress = false;
+        }
+    }
+
+    private void ConfirmDelete(ReviewDto review)
+    {
+        reviewToDelete = review;
+        showDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+        reviewToDelete = null;
+    }
+
+    private async Task DeleteReview()
+    {
+        if (reviewToDelete == null) return;
+        isActionInProgress = true;
+        try
+        {
+            var success = await ReviewService.DeleteReviewAsync(reviewToDelete.Id);
+            if (success)
+            {
+                await LoadReviews();
+                CancelDelete();
+            }
+        }
+        finally
+        {
+            isActionInProgress = false;
+        }
+    }
+}

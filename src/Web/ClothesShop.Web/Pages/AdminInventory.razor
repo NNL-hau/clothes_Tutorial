@@ -1,0 +1,340 @@
+@page "/admin/inventory"
+@layout AdminLayout
+@inherits AuthorizedPageBase
+@inject IProductApiService ProductService
+@inject ICategoryApiService CategoryService
+@using ClothesShop.Web.Models
+
+<div class="admin-inventory">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <div>
+            <h2 style="font-weight: 800; color: var(--text-main); font-size: 2rem; margin: 0;">Quản lý Kho hàng</h2>
+            <p style="color: var(--text-muted); margin: 0;">Theo dõi và cập nhật số lượng tồn kho sản phẩm</p>
+        </div>
+        <div class="inventory-stats d-flex gap-4">
+            <div class="stat-mini">
+                <span class="label">Tổng sản phẩm</span>
+                <span class="value">@products.Count</span>
+            </div>
+            <div class="stat-mini low-stock">
+                <span class="label">Sắp hết hàng</span>
+                <span class="value">@products.Count(p => p.StockQuantity > 0 && p.StockQuantity <= 10)</span>
+            </div>
+            <div class="stat-mini out-of-stock">
+                <span class="label">Hết hàng</span>
+                <span class="value">@products.Count(p => p.StockQuantity == 0)</span>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="glass-card p-5 text-center">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-3 text-muted">Đang tải dữ liệu kho hàng...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">
+            @errorMessage
+            <button class="btn btn-sm btn-outline-danger ms-3" @onclick="LoadProducts">Thử lại</button>
+        </div>
+    }
+    else
+    {
+        <div class="glass-card p-4">
+            <div class="d-flex gap-3 mb-4">
+                <div class="search-box-premium" style="flex: 1;">
+                    <i class="fa-solid fa-magnifying-glass text-muted"></i>
+                    <input type="text" placeholder="Tìm tên sản phẩm..." @bind-value="searchTerm" @bind-value:event="oninput" />
+                </div>
+                <select class="form-select-premium" @bind="filterStatus">
+                    <option value="all">Tất cả trạng thái</option>
+                    <option value="instock">Còn hàng</option>
+                    <option value="low">Sắp hết hàng</option>
+                    <option value="out">Hết hàng</option>
+                </select>
+                <select class="form-select-premium" @bind="selectedCategoryId">
+                    <option value="">Tất cả danh mục</option>
+                    @foreach (var cat in categories)
+                    {
+                        <option value="@cat.Id">@cat.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="table-container">
+                <table class="table-fashion">
+                    <thead>
+                        <tr>
+                            <th>Sản phẩm</th>
+                            <th>Danh mục</th>
+                            <th>Giá hiện tại</th>
+                            <th>Số lượng kho</th>
+                            <th>Trạng thái</th>
+                            <th class="text-center">Cập nhật nhanh</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in FilteredProducts)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <img src="@p.ImageUrl" class="product-thumb-mini" onerror="this.src='/img/no-image.png'" />
+                                        <div style="font-weight: 700; color: var(--text-main);">@p.Name</div>
+                                    </div>
+                                </td>
+                                <td><span style="color: var(--text-muted);">@GetCategoryName(p.CategoryId)</span></td>
+                                <td><span style="font-weight: 600; color: var(--text-main);">@p.Price.ToString("N0")₫</span></td>
+                                <td>
+                                    <div class="stock-display @GetStockLimitClass(p.StockQuantity)">
+                                        @p.StockQuantity
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="stock-badge @GetStockBadgeClass(p.StockQuantity)">
+                                        @GetStockStatusText(p.StockQuantity)
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="quick-stock-update">
+                                        <button @onclick="() => UpdateStock(p, -1)" disabled="@(p.StockQuantity == 0 || isUpdating)">-</button>
+                                        <input type="number" value="@p.StockQuantity" @onchange="@(e => HandleStockChange(p, e.Value?.ToString()))" />
+                                        <button @onclick="() => UpdateStock(p, 1)" disabled="@isUpdating">+</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .product-thumb-mini {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        object-fit: cover;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+    }
+
+    .stock-display {
+        font-weight: 800;
+        font-size: 1.1rem;
+        color: var(--text-main);
+    }
+    .stock-display.low { color: #f59e0b; }
+    .stock-display.out { color: #ef4444; }
+
+    .stock-badge {
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0.3rem 0.7rem;
+        border-radius: 6px;
+    }
+    .stock-badge.in { background: #ecfdf5; color: #10b981; }
+    .stock-badge.low { background: #fff7ed; color: #f97316; }
+    .stock-badge.out { background: #fef2f2; color: #ef4444; }
+
+    .quick-stock-update {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .quick-stock-update button {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+        background: white;
+        color: var(--text-main);
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: var(--transition);
+    }
+
+    .quick-stock-update button:hover:not(:disabled) {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+    }
+
+    .quick-stock-update input {
+        width: 60px;
+        text-align: center;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 0.2rem;
+    }
+
+    .inventory-stats .stat-mini {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+    }
+
+    .inventory-stats .label { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
+    .inventory-stats .value { font-size: 1.2rem; font-weight: 800; color: var(--text-main); }
+    .inventory-stats .low-stock .value { color: #f59e0b; }
+    .inventory-stats .out-of-stock .value { color: #ef4444; }
+
+    .search-box-premium {
+        background: #f1f3f9;
+        border-radius: 14px;
+        padding: 0.8rem 1.2rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .search-box-premium input {
+        border: none;
+        outline: none;
+        background: transparent;
+        width: 100%;
+    }
+
+    .form-select-premium {
+        border: 1px solid #f1f5f9;
+        background: #f1f3f9;
+        border-radius: 14px;
+        padding: 0.8rem 1.2rem;
+        font-weight: 600;
+        color: var(--text-main);
+        outline: none;
+    }
+</style>
+
+@code {
+    private List<ProductDto> products = new();
+    private List<CategoryDto> categories = new();
+    private bool isLoading = true;
+    private bool isUpdating = false;
+    private string errorMessage = string.Empty;
+    private string searchTerm = string.Empty;
+    private string filterStatus = "all";
+    private string selectedCategoryId = string.Empty;
+
+    private IEnumerable<ProductDto> FilteredProducts
+    {
+        get
+        {
+            var filtered = products.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                filtered = filtered.Where(p => p.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+            }
+            if (filterStatus == "instock") filtered = filtered.Where(p => p.StockQuantity > 10);
+            if (filterStatus == "low") filtered = filtered.Where(p => p.StockQuantity > 0 && p.StockQuantity <= 10);
+            if (filterStatus == "out") filtered = filtered.Where(p => p.StockQuantity == 0);
+            
+            if (!string.IsNullOrWhiteSpace(selectedCategoryId) && Guid.TryParse(selectedCategoryId, out var catId))
+            {
+                filtered = filtered.Where(p => p.CategoryId == catId);
+            }
+
+            return filtered.OrderBy(p => p.StockQuantity);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        try
+        {
+            var productsTask = ProductService.GetProductsAsync();
+            var categoriesTask = CategoryService.GetCategoriesAsync();
+            await Task.WhenAll(productsTask, categoriesTask);
+            
+            products = await productsTask;
+            categories = await categoriesTask;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi tải dữ liệu kho: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetCategoryName(Guid id) => categories.FirstOrDefault(c => c.Id == id)?.Name ?? "Chưa phân loại";
+
+    private string GetStockLimitClass(int stock)
+    {
+        if (stock == 0) return "out";
+        if (stock <= 10) return "low";
+        return "";
+    }
+
+    private string GetStockBadgeClass(int stock)
+    {
+        if (stock == 0) return "out";
+        if (stock <= 10) return "low";
+        return "in";
+    }
+
+    private string GetStockStatusText(int stock)
+    {
+        if (stock == 0) return "Hết hàng";
+        if (stock <= 10) return "Sắp hết";
+        return "Còn hàng";
+    }
+
+    private async Task UpdateStock(ProductDto product, int delta)
+    {
+        var newStock = Math.Max(0, product.StockQuantity + delta);
+        await SaveStockUpdate(product, newStock);
+    }
+
+    private async Task HandleStockChange(ProductDto product, string? value)
+    {
+        if (int.TryParse(value, out int newStock) && newStock >= 0)
+        {
+            await SaveStockUpdate(product, newStock);
+        }
+    }
+
+    private async Task SaveStockUpdate(ProductDto product, int newStock)
+    {
+        isUpdating = true;
+        try
+        {
+            var updateDto = new CreateProductDto(
+                product.Name,
+                product.Description,
+                product.Price,
+                product.ImageUrl,
+                product.CategoryId,
+                newStock
+            );
+            var success = await ProductService.UpdateProductAsync(product.Id, updateDto);
+            if (success)
+            {
+                await LoadProducts();
+            }
+        }
+        finally
+        {
+            isUpdating = false;
+        }
+    }
+}

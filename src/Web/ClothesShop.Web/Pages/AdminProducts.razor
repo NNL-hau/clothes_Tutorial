@@ -1,0 +1,953 @@
+@page "/admin/products"
+@layout AdminLayout
+@inherits AuthorizedPageBase
+@inject IProductApiService ProductService
+@inject ICategoryApiService CategoryService
+@using ClothesShop.Web.Helpers
+@using ClothesShop.Web.Components
+@using ClothesShop.Web.Models
+
+<div class="admin-products">
+    <div class="d-flex justify-content-between align-items-center mb-5">
+        <div>
+            <h2 style="font-weight: 800; color: var(--text-main); font-size: 2rem; margin: 0;">Quản lý Sản phẩm</h2>
+            <p style="color: var(--text-muted); margin: 0;">Danh sách toàn bộ sản phẩm trong hệ thống</p>
+        </div>
+        <button class="btn btn-primary-fashion" @onclick="ShowCreateModal">
+            <i class="fa-solid fa-plus me-2"></i> Thêm sản phẩm mới
+        </button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="glass-card p-5 text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Đang tải...</span>
+            </div>
+            <p class="mt-3 text-muted">Đang tải danh sách sản phẩm...</p>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i>
+            @errorMessage
+            <button class="btn btn-sm btn-outline-danger ms-3" @onclick="LoadProducts">Thử lại</button>
+        </div>
+    }
+    else
+    {
+        <div class="glass-card p-4">
+            <div class="d-flex gap-3 mb-4">
+                <div class="search-box-premium">
+                    <i class="fa-solid fa-magnifying-glass text-muted"></i>
+                    <input type="text" placeholder="Tìm tên sản phẩm..." @bind-value="searchTerm" @bind-value:event="oninput" @bind-value:after="OnSearchChanged" />
+                </div>
+                <select class="form-select-premium" style="width: 220px;" @bind="selectedCategoryId" @bind:after="OnFilterChanged">
+                    <option value="">Tất cả danh mục</option>
+                    @foreach (var cat in categories)
+                    {
+                        <option value="@cat.Id">@cat.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="table-container">
+                <table class="table-fashion">
+                    <thead>
+                        <tr>
+                            <th>Sản phẩm</th>
+                            <th>Danh mục</th>
+                            <th>Giá bán</th>
+                            <th>Tồn kho</th>
+                            <th>Trạng thái</th>
+                            <th class="text-center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in PaginatedProducts)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="product-info-cell">
+                                        <div class="product-img-box">
+                                            <img src="@(string.IsNullOrEmpty(p.ImageUrl) ? "https://via.placeholder.com/56" : p.ImageUrl)" />
+                                        </div>
+                                        <div>
+                                            <div class="product-name">@p.Name</div>
+                                            <div class="product-sku">SKU: @p.Id.ToString().Substring(0, 8).ToUpper()</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span class="category-badge">@GetCategoryName(p.CategoryId)</span></td>
+                                <td class="price-cell">@p.Price.ToString("N0") ₫</td>
+                                <td>
+                                    <div class="stock-info">
+                                        <strong>@p.StockQuantity</strong>
+                                        <div class="progress mt-1" style="height: 4px; width: 60px;">
+                                            <div class="progress-bar bg-primary" style="width: @(Math.Min(p.StockQuantity, 100))%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="status-badge @(p.StockQuantity > 10 ? "status-success" : "status-warning")">
+                                        <i class="fa-solid fa-circle me-1" style="font-size: 0.5rem;"></i>
+                                        @(p.StockQuantity > 10 ? "Đang bán" : "Sắp hết hàng")
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="action-buttons">
+                                        <button class="btn-action edit" @onclick="() => ShowEditModal(p)" title="Chỉnh sửa">
+                                            <i class="fa-solid fa-pen-to-square"></i>
+                                        </button>
+                                        <button class="btn-action delete" @onclick="() => ConfirmDelete(p)" title="Xóa">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                @if (!FilteredProducts.Any())
+                {
+                    <div class="text-center py-5">
+                        <i class="fa-solid fa-box-open" style="font-size: 3rem; color: var(--text-muted);"></i>
+                        <p class="mt-3 text-muted">Không tìm thấy sản phẩm nào</p>
+                    </div>
+                }
+            </div>
+
+            @* Pagination *@
+            @if (FilteredProducts.Any())
+            {
+                <PaginationComponent 
+                    CurrentPage="@currentPage"
+                    PageSize="@pageSize"
+                    TotalItems="@FilteredProducts.Count()"
+                    OnPageChanged="OnPageChanged"
+                    OnPageSizeChanged="OnPageSizeChanged" />
+            }
+        </div>
+    }
+</div>
+
+@* Modal Form *@
+@if (showModal)
+{
+    <div class="modal-overlay" @onclick="CloseModal">
+        <div class="modal-dialog-custom modal-lg" @onclick:stopPropagation>
+            <div class="modal-header-custom">
+                <h4><i class="fa-solid fa-@(isEditMode ? "pen-to-square" : "plus") me-2"></i>@(isEditMode ? "Chỉnh sửa" : "Thêm") sản phẩm</h4>
+                <button class="btn-close-custom" @onclick="CloseModal">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <div class="form-group mb-3">
+                    <label class="form-label-custom">Tên sản phẩm <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control-custom @(validationErrors.ContainsKey("Name") ? "is-invalid" : "")" 
+                           @bind="formData.Name" placeholder="Nhập tên sản phẩm" />
+                    @if (validationErrors.ContainsKey("Name"))
+                    {
+                        <div class="invalid-feedback d-block">@validationErrors["Name"]</div>
+                    }
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label class="form-label-custom">Mô tả</label>
+                    <textarea class="form-control-custom" @bind="formData.Description" rows="3" placeholder="Nhập mô tả sản phẩm"></textarea>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label-custom">Giá bán (₫) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control-custom @(validationErrors.ContainsKey("Price") ? "is-invalid" : "")" 
+                               @bind="formData.Price" placeholder="0" />
+                        @if (validationErrors.ContainsKey("Price"))
+                        {
+                            <div class="invalid-feedback d-block">@validationErrors["Price"]</div>
+                        }
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label-custom">Số lượng tồn kho <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control-custom @(validationErrors.ContainsKey("Stock") ? "is-invalid" : "")" 
+                               @bind="formData.StockQuantity" placeholder="0" />
+                        @if (validationErrors.ContainsKey("Stock"))
+                        {
+                            <div class="invalid-feedback d-block">@validationErrors["Stock"]</div>
+                        }
+                    </div>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label class="form-label-custom">Danh mục <span class="text-danger">*</span></label>
+                    <select class="form-control-custom @(validationErrors.ContainsKey("Category") ? "is-invalid" : "")" 
+                            @bind="formData.CategoryId">
+                        <option value="@Guid.Empty">-- Chọn danh mục --</option>
+                        @foreach (var cat in categories)
+                        {
+                            <option value="@cat.Id">@cat.Name</option>
+                        }
+                    </select>
+                    @if (validationErrors.ContainsKey("Category"))
+                    {
+                        <div class="invalid-feedback d-block">@validationErrors["Category"]</div>
+                    }
+                </div>
+
+                <div class="form-group mb-3">
+                    <label class="form-label-custom">Hình ảnh sản phẩm</label>
+                    
+                    <ul class="nav nav-tabs mb-3">
+                        <li class="nav-item">
+                            <button class="nav-link @(imageInputMode == "upload" ? "active" : "")" 
+                                    @onclick='() => imageInputMode = "upload"'>
+                                <i class="fa-solid fa-cloud-arrow-up me-1"></i> Tải lên
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(imageInputMode == "url" ? "active" : "")" 
+                                    @onclick='() => imageInputMode = "url"'>
+                                <i class="fa-solid fa-link me-1"></i> Nhập URL
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    @if (imageInputMode == "upload")
+                    {
+                        <ImageUploadComponent @bind-ImageUrl="formData.ImageUrl" />
+                    }
+                    else
+                    {
+                        <input type="text" class="form-control-custom @(validationErrors.ContainsKey("ImageUrl") ? "is-invalid" : "")" 
+                               @bind="formData.ImageUrl" placeholder="https://example.com/image.jpg" />
+                        @if (validationErrors.ContainsKey("ImageUrl"))
+                        {
+                            <div class="invalid-feedback d-block">@validationErrors["ImageUrl"]</div>
+                        }
+                    }
+                </div>
+
+                @if (!string.IsNullOrEmpty(formError))
+                {
+                    <div class="alert alert-danger">@formError</div>
+                }
+            </div>
+            <div class="modal-footer-custom">
+                <button class="btn btn-secondary-custom" @onclick="CloseModal">Hủy</button>
+                <button class="btn btn-primary-custom" @onclick="SaveProduct" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    else
+                    {
+                        <i class="fa-solid fa-save me-2"></i>
+                    }
+                    Lưu
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* Delete Confirmation Modal *@
+@if (showDeleteConfirm && productToDelete != null)
+{
+    <div class="modal-overlay" @onclick="CancelDelete">
+        <div class="modal-dialog-custom confirm-dialog" @onclick:stopPropagation>
+            <div class="modal-header-custom">
+                <h4><i class="fa-solid fa-trash-can me-2 text-danger"></i>Xác nhận xóa</h4>
+                <button class="btn-close-custom" @onclick="CancelDelete">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                <p>Bạn có chắc chắn muốn xóa sản phẩm <strong>@productToDelete.Name</strong>?</p>
+                <p class="text-muted">Hành động này không thể hoàn tác.</p>
+            </div>
+            <div class="modal-footer-custom">
+                <button class="btn btn-secondary-custom" @onclick="CancelDelete">Hủy</button>
+                <button class="btn btn-danger-custom" @onclick="DeleteProduct" disabled="@isDeleting">
+                    @if (isDeleting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Xóa
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .btn-primary-fashion {
+        background: var(--primary-color);
+        color: white;
+        border-radius: 14px;
+        padding: 0.8rem 1.8rem;
+        font-weight: 600;
+        border: none;
+        box-shadow: 0 4px 15px rgba(107, 70, 193, 0.3);
+        transition: var(--transition);
+    }
+    
+    .btn-primary-fashion:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(107, 70, 193, 0.4);
+        background: #5b39a8;
+    }
+
+    .search-box-premium {
+        background: #f1f3f9;
+        border-radius: 14px;
+        padding: 0.8rem 1.2rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex: 1;
+    }
+
+    .search-box-premium input {
+        border: none;
+        outline: none;
+        background: transparent;
+        width: 100%;
+    }
+
+    .form-select-premium {
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 0.8rem 1.2rem;
+        background-color: white;
+        color: var(--text-main);
+        font-weight: 500;
+    }
+
+    .table-fashion {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 0.8rem;
+    }
+
+    .table-fashion th {
+        padding: 1rem 1.5rem;
+        color: var(--text-muted);
+        font-weight: 600;
+        font-size: 0.9rem;
+        border: none;
+    }
+
+    .table-fashion tr {
+        background: white;
+        transition: var(--transition);
+    }
+
+    .table-fashion tbody tr:hover {
+        transform: scale(1.005);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.03);
+    }
+
+    .table-fashion td {
+        padding: 1.2rem 1.5rem;
+        vertical-align: middle;
+        border-top: 1px solid #f8f9fa;
+        border-bottom: 1px solid #f8f9fa;
+    }
+
+    .table-fashion td:first-child {
+        border-left: 1px solid #f8f9fa;
+        border-radius: 16px 0 0 16px;
+    }
+
+    .table-fashion td:last-child {
+        border-right: 1px solid #f8f9fa;
+        border-radius: 0 16px 16px 0;
+    }
+
+    .product-info-cell {
+        display: flex;
+        align-items: center;
+        gap: 1.2rem;
+    }
+
+    .product-img-box {
+        width: 56px;
+        height: 56px;
+        border-radius: 12px;
+        background: #f1f3f9;
+        overflow: hidden;
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .product-img-box img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .product-name {
+        font-weight: 700;
+        color: var(--text-main);
+        font-size: 1.05rem;
+    }
+
+    .product-sku {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .category-badge {
+        background: var(--primary-light);
+        color: var(--primary-color);
+        padding: 0.4rem 1rem;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+
+    .price-cell {
+        font-weight: 700;
+        color: var(--text-main);
+    }
+
+    .status-badge {
+        padding: 0.4rem 1rem;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .status-success {
+        background: #ecfdf5;
+        color: #059669;
+    }
+
+    .status-warning {
+        background: #fffbeb;
+        color: #d97706;
+    }
+
+    .action-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 0.8rem;
+    }
+
+    .btn-action {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: var(--transition);
+        font-size: 1.1rem;
+    }
+
+    .btn-action.edit { background: #f0f4ff; color: #4338ca; }
+    .btn-action.delete { background: #fff1f2; color: #e11d48; }
+
+    .btn-action:hover {
+        transform: translateY(-3px);
+        filter: brightness(0.95);
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        backdrop-filter: blur(5px);
+    }
+
+    .modal-dialog-custom {
+        background: white;
+        border-radius: 20px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        animation: modalFadeIn 0.3s ease;
+    }
+
+    .modal-dialog-custom.modal-lg {
+        max-width: 700px;
+    }
+
+    .modal-dialog-custom.confirm-dialog {
+        max-width: 450px;
+    }
+
+    @@keyframes modalFadeIn {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .modal-header-custom {
+        padding: 1.5rem 2rem;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header-custom h4 {
+        margin: 0;
+        font-weight: 700;
+        color: var(--text-main);
+    }
+
+    .btn-close-custom {
+        background: none;
+        border: none;
+        font-size: 2rem;
+        color: var(--text-muted);
+        cursor: pointer;
+        line-height: 1;
+        padding: 0;
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        transition: var(--transition);
+    }
+
+    .btn-close-custom:hover {
+        background: #f1f3f9;
+        color: var(--text-main);
+    }
+
+    .modal-body-custom {
+        padding: 2rem;
+    }
+
+    .modal-footer-custom {
+        padding: 1.5rem 2rem;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+    }
+
+    .form-label-custom {
+        display: block;
+        font-weight: 600;
+        color: var(--text-main);
+        margin-bottom: 0.5rem;
+        font-size: 0.95rem;
+    }
+
+    .form-control-custom {
+        width: 100%;
+        padding: 0.8rem 1.2rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        font-size: 1rem;
+        transition: var(--transition);
+    }
+
+    .form-control-custom:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(107, 70, 193, 0.1);
+    }
+
+    .form-control-custom.is-invalid {
+        border-color: #dc2626;
+    }
+
+    .invalid-feedback {
+        color: #dc2626;
+        font-size: 0.85rem;
+        margin-top: 0.25rem;
+    }
+
+    .btn-secondary-custom, .btn-primary-custom, .btn-danger-custom {
+        padding: 0.7rem 1.5rem;
+        border-radius: 12px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .btn-secondary-custom {
+        background: #f1f3f9;
+        color: var(--text-main);
+    }
+
+    .btn-secondary-custom:hover {
+        background: #e2e8f0;
+    }
+
+    .btn-primary-custom {
+        background: var(--primary-color);
+        color: white;
+    }
+
+    .btn-primary-custom:hover {
+        background: #5b39a8;
+        transform: translateY(-2px);
+    }
+
+    .btn-danger-custom {
+        background: #dc2626;
+        color: white;
+    }
+
+    .btn-danger-custom:hover {
+        background: #b91c1c;
+    }
+
+    .nav-tabs {
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    .nav-item {
+        margin: 0;
+    }
+
+    .nav-link {
+        border: none;
+        background: none;
+        padding: 0.7rem 1.2rem;
+        color: var(--text-muted);
+        font-weight: 600;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .nav-link:hover {
+        color: var(--primary-color);
+    }
+
+    .nav-link.active {
+        color: var(--primary-color);
+        border-bottom-color: var(--primary-color);
+    }
+</style>
+
+@code {
+    private List<ProductDto> products = new();
+    private List<CategoryDto> categories = new();
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private string searchTerm = string.Empty;
+    private string selectedCategoryId = string.Empty;
+
+    // Pagination
+    private int currentPage = 1;
+    private int pageSize = 10;
+
+    // Modal state
+    private bool showModal = false;
+    private bool isEditMode = false;
+    private bool isSaving = false;
+    private string formError = string.Empty;
+    private ProductDto? editingProduct = null;
+    private string imageInputMode = "upload"; // "upload" or "url"
+    
+    // Delete confirmation
+    private bool showDeleteConfirm = false;
+    private bool isDeleting = false;
+    private ProductDto? productToDelete = null;
+
+    // Validation
+    private Dictionary<string, string> validationErrors = new();
+
+    // Form data
+    private class ProductFormData
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public decimal Price { get; set; }
+        public string? ImageUrl { get; set; }
+        public Guid CategoryId { get; set; }
+        public int StockQuantity { get; set; }
+    }
+
+    private ProductFormData formData = new();
+
+    private IEnumerable<ProductDto> FilteredProducts
+    {
+        get
+        {
+            var filtered = products.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                filtered = filtered.Where(p => p.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedCategoryId) && Guid.TryParse(selectedCategoryId, out var catId))
+            {
+                filtered = filtered.Where(p => p.CategoryId == catId);
+            }
+
+            return filtered;
+        }
+    }
+
+    private IEnumerable<ProductDto> PaginatedProducts
+    {
+        get
+        {
+            return FilteredProducts
+                .Skip((currentPage - 1) * pageSize)
+                .Take(pageSize);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+        await LoadCategories();
+    }
+
+    private async Task LoadProducts()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        try
+        {
+            products = await ProductService.GetProductsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi tải danh sách sản phẩm: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadCategories()
+    {
+        try
+        {
+            categories = await CategoryService.GetCategoriesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading categories: {ex.Message}");
+        }
+    }
+
+    private string GetCategoryName(Guid categoryId)
+    {
+        return categories.FirstOrDefault(c => c.Id == categoryId)?.Name ?? "N/A";
+    }
+
+    private void OnSearchChanged()
+    {
+        currentPage = 1; // Reset to first page on search
+    }
+
+    private void OnFilterChanged()
+    {
+        currentPage = 1; // Reset to first page on filter
+    }
+
+    private Task OnPageChanged(int newPage)
+    {
+        currentPage = newPage;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task OnPageSizeChanged(int newPageSize)
+    {
+        pageSize = newPageSize;
+        currentPage = 1;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private void ShowCreateModal()
+    {
+        isEditMode = false;
+        editingProduct = null;
+        formData = new ProductFormData();
+        validationErrors.Clear();
+        formError = string.Empty;
+        imageInputMode = "upload";
+        showModal = true;
+    }
+
+    private void ShowEditModal(ProductDto product)
+    {
+        isEditMode = true;
+        editingProduct = product;
+        formData = new ProductFormData
+        {
+            Name = product.Name,
+            Description = product.Description,
+            Price = product.Price,
+            ImageUrl = product.ImageUrl,
+            CategoryId = product.CategoryId,
+            StockQuantity = product.StockQuantity
+        };
+        validationErrors.Clear();
+        formError = string.Empty;
+        imageInputMode = string.IsNullOrEmpty(product.ImageUrl) ? "upload" : "url";
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        validationErrors.Clear();
+        formError = string.Empty;
+    }
+
+    private bool ValidateForm()
+    {
+        validationErrors.Clear();
+
+        // Validate Name
+        var nameError = ValidationHelpers.ValidateProductName(formData.Name);
+        if (nameError != null)
+            validationErrors["Name"] = nameError;
+
+        // Validate Price
+        var priceError = ValidationHelpers.ValidatePrice(formData.Price);
+        if (priceError != null)
+            validationErrors["Price"] = priceError;
+
+        // Validate Stock
+        var stockError = ValidationHelpers.ValidateStock(formData.StockQuantity);
+        if (stockError != null)
+            validationErrors["Stock"] = stockError;
+
+        // Validate Category
+        if (formData.CategoryId == Guid.Empty)
+            validationErrors["Category"] = "Vui lòng chọn danh mục";
+
+        // Validate Image URL (if provided and in URL mode)
+        if (imageInputMode == "url" && !string.IsNullOrWhiteSpace(formData.ImageUrl))
+        {
+            var imageError = ValidationHelpers.ValidateImageUrl(formData.ImageUrl, false);
+            if (imageError != null)
+                validationErrors["ImageUrl"] = imageError;
+        }
+
+        return validationErrors.Count == 0;
+    }
+
+    private async Task SaveProduct()
+    {
+        if (!ValidateForm())
+        {
+            formError = "Vui lòng kiểm tra lại thông tin đã nhập";
+            return;
+        }
+
+        isSaving = true;
+        formError = string.Empty;
+
+        try
+        {
+            var dto = new CreateProductDto(
+                formData.Name,
+                formData.Description,
+                formData.Price,
+                formData.ImageUrl,
+                formData.CategoryId,
+                formData.StockQuantity
+            );
+
+            if (isEditMode && editingProduct != null)
+            {
+                var success = await ProductService.UpdateProductAsync(editingProduct.Id, dto);
+                if (success)
+                {
+                    await LoadProducts();
+                    CloseModal();
+                }
+                else
+                {
+                    formError = "Lỗi cập nhật sản phẩm";
+                }
+            }
+            else
+            {
+                var result = await ProductService.CreateProductAsync(dto);
+                if (result != null)
+                {
+                    await LoadProducts();
+                    CloseModal();
+                }
+                else
+                {
+                    formError = "Lỗi tạo sản phẩm";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            formError = $"Lỗi: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void ConfirmDelete(ProductDto product)
+    {
+        productToDelete = product;
+        showDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+        productToDelete = null;
+    }
+
+    private async Task DeleteProduct()
+    {
+        if (productToDelete == null) return;
+
+        isDeleting = true;
+        try
+        {
+            var success = await ProductService.DeleteProductAsync(productToDelete.Id);
+            if (success)
+            {
+                await LoadProducts();
+                CancelDelete();
+
+                // Adjust page if current page is empty after delete
+                if (!PaginatedProducts.Any() && currentPage > 1)
+                {
+                    currentPage--;
+                }
+            }
+            else
+            {
+                errorMessage = "Lỗi xóa sản phẩm";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi: {ex.Message}";
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+}

@@ -1,0 +1,147 @@
+@page "/admin/search"
+@layout AdminLayout
+@inherits AuthorizedPageBase
+@inject IProductApiService ProductService
+@inject IOrderApiService OrderService
+@inject IUserApiService UserService
+@using ClothesShop.Web.Models
+
+<div class="admin-search">
+    <div class="mb-5">
+        <h2 style="font-weight: 800; color: var(--text-main); font-size: 2rem; margin: 0;">Kết quả tìm kiếm</h2>
+        <p style="color: var(--text-muted); margin: 0;">Tìm thấy cho từ khóa: <strong style="color: var(--primary-color);">"@SearchQuery"</strong></p>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="glass-card p-5 text-center">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-3 text-muted">Đang tìm kiếm thông tin...</p>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            @* Products Results *@
+            <div class="col-12">
+                <div class="glass-card p-4">
+                    <h5 class="mb-4" style="font-weight: 700;"><i class="fa-solid fa-shirt me-2"></i>Sản phẩm (@products.Count)</h5>
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <tbody>
+                                @foreach (var p in products)
+                                {
+                                    <tr>
+                                        <td style="width: 50px;"><img src="@p.ImageUrl" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;" /></td>
+                                        <td><strong>@p.Name</strong></td>
+                                        <td>@p.Price.ToString("N0")₫</td>
+                                        <td><span class="badge @(p.StockQuantity > 0 ? "bg-success" : "bg-danger")">@(p.StockQuantity > 0 ? $"Còn {p.StockQuantity}" : "Hết hàng")</span></td>
+                                        <td class="text-end"><NavLink href="@($"/admin/products")" class="btn btn-sm btn-outline-primary">Chi tiết</NavLink></td>
+                                    </tr>
+                                }
+                                @if (!products.Any())
+                                {
+                                    <tr><td colspan="5" class="text-center py-4 text-muted">Không tìm thấy sản phẩm nào</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            @* Orders Results *@
+            <div class="col-md-6">
+                <div class="glass-card p-4">
+                    <h5 class="mb-4" style="font-weight: 700;"><i class="fa-solid fa-truck-fast me-2"></i>Đơn hàng (@orders.Count)</h5>
+                    <div class="list-group list-group-flush">
+                        @foreach (var o in orders)
+                        {
+                            <NavLink href="/admin/orders" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center border-0 px-0">
+                                <div>
+                                    <div style="font-weight: 600;">#@o.Id.ToString().Substring(0, 8)</div>
+                                    <small class="text-muted">@o.UserName - @o.CreatedAt.ToString("dd/MM")</small>
+                                </div>
+                                <span class="badge bg-light text-dark">@o.TotalPrice.ToString("N0")₫</span>
+                            </NavLink>
+                        }
+                        @if (!orders.Any())
+                        {
+                            <div class="text-center py-4 text-muted">Không tìm thấy đơn hàng nào</div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @* Users Results *@
+            <div class="col-md-6">
+                <div class="glass-card p-4">
+                    <h5 class="mb-4" style="font-weight: 700;"><i class="fa-solid fa-user-group me-2"></i>Tài khoản (@users.Count)</h5>
+                    <div class="list-group list-group-flush">
+                        @foreach (var u in users)
+                        {
+                            <NavLink href="/admin/users" class="list-group-item list-group-item-action d-flex align-items-center gap-3 border-0 px-0">
+                                <div style="width: 40px; height: 40px; border-radius: 50%; background: #f1f5f9; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fa-solid fa-user text-primary"></i>
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600;">@u.FullName</div>
+                                    <small class="text-muted">@u.Email</small>
+                                </div>
+                            </NavLink>
+                        }
+                        @if (!users.Any())
+                        {
+                            <div class="text-center py-4 text-muted">Không tìm thấy người dùng nào</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, SupplyParameterFromQuery(Name = "q")]
+    public string? SearchQuery { get; set; }
+
+    private List<ProductDto> products = new();
+    private List<OrderDto> orders = new();
+    private List<UserDto> users = new();
+    private bool isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await PerformSearch();
+    }
+
+    private async Task PerformSearch()
+    {
+        if (string.IsNullOrWhiteSpace(SearchQuery)) return;
+
+        isLoading = true;
+        try
+        {
+            var pTask = ProductService.GetProductsAsync();
+            var oTask = OrderService.GetOrdersAsync();
+            var uTask = UserService.GetUsersAsync();
+
+            await Task.WhenAll(pTask, oTask, uTask);
+
+            var allProducts = await pTask;
+            var allOrders = await oTask;
+            var allUsers = await uTask;
+
+            products = allProducts.Where(p => p.Name.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase)).ToList();
+            orders = allOrders.Where(o => o.Id.ToString().Contains(SearchQuery, StringComparison.OrdinalIgnoreCase) || o.UserName.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase)).ToList();
+            users = allUsers.Where(u => u.FullName.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase) || u.Email.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Search Error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
