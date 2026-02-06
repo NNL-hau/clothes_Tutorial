@@ -195,6 +195,9 @@ code {
     max-width: 500px;
     border-radius: 15px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     animation: slideIn 0.3s ease-out;
 }
@@ -216,7 +219,11 @@ code {
 .modal-header-custom h4 { margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-main); }
 .btn-close-custom { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); }
 
-.modal-body-custom { padding: 25px; }
+.modal-body-custom { 
+    padding: 25px; 
+    overflow-y: auto;
+    flex: 1;
+}
 
 .form-label-custom { display: block; margin-bottom: 8px; font-weight: 600; font-size: 0.9rem; color: var(--text-main); }
 .form-control-custom {
@@ -237,7 +244,7 @@ code {
     gap: 10px;
 }
 
-.btn-primary-fashion {
+.btn-primary-fashion, .btn-primary-custom {
     background: var(--primary-fashion);
     color: white;
     border: none;
@@ -245,8 +252,16 @@ code {
     border-radius: 8px;
     font-weight: 600;
     transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
 }
-.btn-primary-fashion:hover { background: var(--primary-dark); transform: translateY(-2px); }
+.btn-primary-fashion:hover, .btn-primary-custom:hover { 
+    background: var(--primary-dark); 
+    transform: translateY(-2px);
+    color: white;
+}
 
 .btn-secondary-custom {
     background: #e2e8f0;

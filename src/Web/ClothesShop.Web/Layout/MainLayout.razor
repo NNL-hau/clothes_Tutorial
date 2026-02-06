@@ -1,54 +1,28 @@
 ﻿@inherits LayoutComponentBase
-@inject IAuthService AuthService
-@using ClothesShop.Web.Services
-@inject NavigationManager Navigation
 
 <div class="page">
+    <HeaderNav />
+    
     <main>
-        <div class="top-row px-4">
-            <div class="nav-links">
-                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                    <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Trang Chủ
-                </NavLink>
-                <NavLink class="nav-link" href="products">
-                    <span class="bi bi-shop-nav-menu" aria-hidden="true"></span> Sản Phẩm
-                </NavLink>
-                <NavLink class="nav-link" href="cart">
-                    <span class="bi bi-cart-fill-nav-menu" aria-hidden="true"></span> Giỏ Hàng
-                </NavLink>
-                
-                @if (isAuthenticated)
-                {
-                    <a class="nav-link" href="" @onclick="HandleLogout" @onclick:preventDefault>
-                        <span class="bi bi-person-x-fill-nav-menu" aria-hidden="true"></span> Đăng Xuất
-                    </a>
-                }
-                else
-                {
-                    <NavLink class="nav-link" href="login">
-                        <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> Đăng Nhập
-                    </NavLink>
-                }
-            </div>
-        </div>
-
-        <article class="content px-4">
+        <article class="content">
             @Body
         </article>
     </main>
 </div>
 
-@code {
-    private bool isAuthenticated = false;
-
-    protected override async Task OnInitializedAsync()
-    {
-        isAuthenticated = await AuthService.IsAuthenticatedAsync();
+<style>
+    .page {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
     }
-
-    private async Task HandleLogout()
-    {
-        await AuthService.LogoutAsync();
-        Navigation.NavigateTo("/", true);
+    
+    main {
+        flex: 1;
     }
-}
+    
+    .content {
+        background: #fafafa;
+    }
+</style>
+

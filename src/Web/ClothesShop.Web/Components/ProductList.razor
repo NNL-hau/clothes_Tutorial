@@ -1,6 +1,7 @@
 @using ClothesShop.Web.Models
 @using ClothesShop.Web.Services
 @inject IProductApiService ProductService
+@inject ICategoryApiService CategoryService
 
 <div class="product-list-section">
     <div class="section-header">
@@ -17,7 +18,7 @@
     else if (products.Count == 0)
     {
         <div class="empty-state">
-            <p>Chưa có sản phẩm nào</p>
+            <p>Chưa có sản phẩm nào cho mục này</p>
         </div>
     }
     else
@@ -46,6 +47,9 @@
     
     [Parameter]
     public int InitialCount { get; set; } = 12;
+
+    [Parameter]
+    public string? CategoryKeyword { get; set; }
     
     private List<ProductDto> products = new();
     private int DisplayCount { get; set; }
@@ -54,6 +58,10 @@
     protected override async Task OnInitializedAsync()
     {
         DisplayCount = InitialCount;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
         await LoadProducts();
     }
 
@@ -62,12 +70,26 @@
         isLoading = true;
         try
         {
-            products = await ProductService.GetProductsAsync();
+            var allProducts = await ProductService.GetProductsAsync();
+            
+            if (!string.IsNullOrEmpty(CategoryKeyword))
+            {
+                var categories = await CategoryService.GetCategoriesAsync();
+                var targetCategoryIds = categories
+                    .Where(c => c.Name.Contains(CategoryKeyword, StringComparison.OrdinalIgnoreCase))
+                    .Select(c => c.Id)
+                    .ToList();
+                
+                products = allProducts.Where(p => targetCategoryIds.Contains(p.CategoryId)).ToList();
+            }
+            else
+            {
+                products = allProducts;
+            }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error loading products: {ex.Message}");
-            // TODO: Show error message to user
         }
         finally
         {

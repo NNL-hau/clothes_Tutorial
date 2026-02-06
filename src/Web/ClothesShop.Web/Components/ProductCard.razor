@@ -1,33 +1,145 @@
 @using ClothesShop.Web.Models
+@using ClothesShop.Web.Services
+@inject IBasketService BasketService
+@inject IAuthService AuthService
 
 <div class="product-card">
-    <a href="/products/@Product.Id" class="card-link">
-        <div class="product-image">
-            <img src="@(string.IsNullOrEmpty(Product.ImageUrl) ? "/images/placeholder-product.jpg" : Product.ImageUrl)" 
-                 alt="@Product.Name" />
-            @if (Product.StockQuantity == 0)
-            {
-                <div class="badge out-of-stock">Hết hàng</div>
-            }
-            else if (IsNew)
-            {
-                <div class="badge new">New</div>
-            }
-        </div>
+    <div class="product-image" @onclick="OpenDetail">
+        <img src="@(string.IsNullOrEmpty(Product.ImageUrl) ? "/images/placeholder-product.jpg" : Product.ImageUrl)" 
+             alt="@Product.Name" />
+        @if (Product.StockQuantity == 0)
+        {
+            <div class="badge out-of-stock">Hết hàng</div>
+        }
+        else if (IsNew)
+        {
+            <div class="badge new">New</div>
+        }
         
-        <div class="product-info">
-            <h3 class="product-name">@Product.Name</h3>
+        <div class="product-actions-overlay">
+            <button class="action-btn view-detail" @onclick="OpenDetail" @onclick:stopPropagation>
+                <i class="fa-solid fa-eye"></i>
+                <span>Xem chi tiết</span>
+            </button>
+            <button class="action-btn add-to-cart" @onclick="HandleAddToCart" @onclick:stopPropagation disabled="@(Product.StockQuantity == 0)">
+                <i class="fa-solid fa-cart-plus"></i>
+                <span>Thêm giỏ hàng</span>
+            </button>
+        </div>
+    </div>
+    
+    <div class="product-info" @onclick="OpenDetail">
+        <h3 class="product-name">@Product.Name</h3>
+        
+        <div class="product-price">
+            <span class="current-price">@Product.Price.ToString("N0") đ</span>
+        </div>
+    </div>
+</div>
+
+@if (showDetail)
+{
+    <div class="product-detail-modal-overlay" @onclick="CloseDetail">
+        <div class="product-detail-modal" @onclick:stopPropagation>
+            <button class="close-btn" @onclick="CloseDetail">✕</button>
             
-            <div class="product-price">
-                <span class="current-price">@Product.Price.ToString("N0") đ</span>
+            <div class="detail-container">
+                <div class="detail-image">
+                    <img src="@(string.IsNullOrEmpty(Product.ImageUrl) ? "/images/placeholder-product.jpg" : Product.ImageUrl)" alt="@Product.Name" />
+                </div>
+                
+                <div class="detail-info">
+                    <h2 class="detail-name">@Product.Name</h2>
+                    <div class="detail-price">@Product.Price.ToString("N0") đ</div>
+                    
+                    <div class="detail-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Trạng thái:</span>
+                            <span class="meta-value @(Product.StockQuantity > 0 ? "in-stock" : "out-of-stock")">
+                                @(Product.StockQuantity > 0 ? "Còn hàng" : "Hết hàng")
+                            </span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Số lượng tồn:</span>
+                            <span class="meta-value">@Product.StockQuantity</span>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-description">
+                        <h3>Mô tả sản phẩm</h3>
+                        <p>@(string.IsNullOrEmpty(Product.Description) ? "Đây là sản phẩm mới và mẫu đẹp nhất tại shop" : Product.Description)</p>
+                    </div>
+                    
+                    <button class="add-to-cart-big" @onclick="HandleAddToCart" disabled="@(Product.StockQuantity == 0)">
+                        <i class="fa-solid fa-cart-plus mr-2"></i>
+                        THÊM VÀO GIỎ HÀNG
+                    </button>
+                    
+                    @if (showSuccess)
+                    {
+                        <div class="success-toast">
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span>Đã thêm vào giỏ hàng!</span>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="error-toast">
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                            <span>@errorMessage</span>
+                        </div>
+                    }
+                </div>
             </div>
         </div>
-    </a>
-</div>
+    </div>
+}
 
 @code {
     [Parameter]
     public ProductDto Product { get; set; } = null!;
     
+    private bool showDetail = false;
+    private bool showSuccess = false;
+    private string? errorMessage;
     private bool IsNew => (DateTime.Now - Product.CreatedAt).TotalDays <= 30;
+
+    private void OpenDetail()
+    {
+        errorMessage = null;
+        showDetail = true;
+    }
+    private void CloseDetail() => showDetail = false;
+
+    private async Task HandleAddToCart()
+    {
+        errorMessage = null;
+        
+        if (!await AuthService.IsAuthenticatedAsync())
+        {
+            errorMessage = "Vui lòng đăng nhập để sử dụng chức năng này!";
+            if (!showDetail) showDetail = true;
+            StateHasChanged();
+            
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(3000);
+                errorMessage = null;
+                await InvokeAsync(StateHasChanged);
+            });
+            return;
+        }
+
+        await BasketService.AddToBasketAsync(Product);
+        showSuccess = true;
+        StateHasChanged();
+        
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(2000);
+            showSuccess = false;
+            await InvokeAsync(StateHasChanged);
+        });
+    }
 }

@@ -1,204 +1,26 @@
 ﻿@page "/"
-@using ClothesShop.Web.Services
-@inject IAuthService AuthService
 
-<PageTitle>Trang Chủ</PageTitle>
+<PageTitle>Trang Chủ - Shop Quần Áo</PageTitle>
 
-<div class="home-container">
-    <div class="hero-section">
-        <h1 class="hero-title">🛍️ Chào Mừng Đến Shop Quần Áo</h1>
-        
-        @if (isAuthenticated && currentUser != null)
-        {
-            <p class="hero-subtitle">Xin chào, <strong>@currentUser.FullName</strong>!</p>
-            <p>Bạn đã đăng nhập với email: @currentUser.Email</p>
-            <p>Vai trò: <span class="badge">@currentUser.Role</span></p>
-        }
-        else
-        {
-            <p class="hero-subtitle">Hệ thống quản lý shop quần áo hiện đại</p>
-            <div class="cta-buttons">
-                <a href="/login" class="btn btn-primary">Đăng Nhập</a>
-                <a href="/register" class="btn btn-secondary">Đăng Ký Ngay</a>
-            </div>
-        }
-    </div>
+<div class="home-page">
+    <BannerCarousel />
     
-    <div class="features-section">
-        <h2>Tính Năng Chính</h2>
-        <div class="features-grid">
-            <div class="feature-card">
-                <div class="feature-icon">🔐</div>
-                <h3>Xác Thực An Toàn</h3>
-                <p>Đăng ký và đăng nhập với JWT authentication</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">👕</div>
-                <h3>Quản Lý Sản Phẩm</h3>
-                <p>Danh mục quần áo phong phú</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🛒</div>
-                <h3>Giỏ Hàng</h3>
-                <p>Quản lý giỏ hàng dễ dàng</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">💳</div>
-                <h3>Thanh Toán</h3>
-                <p>Hệ thống thanh toán an toàn</p>
-            </div>
-        </div>
+    <div class="container">
+        <ProductList Title="THỜI TRANG NAM" InitialCount="8" CategoryKeyword="nam" />
+        <div style="height: 40px;"></div>
+        <ProductList Title="THỜI TRANG NỮ" InitialCount="8" CategoryKeyword="nữ" />
     </div>
 </div>
 
 <style>
-    .home-container {
-        padding: 20px;
-        max-width: 1200px;
+    .home-page {
+        background: #fff;
+    }
+    
+    .container {
+        max-width: 1400px;
         margin: 0 auto;
-    }
-    
-    .hero-section {
-        text-align: center;
-        padding: 60px 20px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 16px;
-        color: white;
-        margin-bottom: 60px;
-        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
-    }
-    
-    .hero-title {
-        font-size: 3rem;
-        margin-bottom: 20px;
-        font-weight: 700;
-    }
-    
-    .hero-subtitle {
-        font-size: 1.5rem;
-        margin-bottom: 30px;
-        opacity: 0.95;
-    }
-    
-    .badge {
-        background: rgba(255, 255, 255, 0.2);
-        padding: 5px 15px;
-        border-radius: 20px;
-        font-weight: 600;
-    }
-    
-    .cta-buttons {
-        display: flex;
-        gap: 20px;
-        justify-content: center;
-        margin-top: 30px;
-    }
-    
-    .btn {
-        padding: 14px 32px;
-        border-radius: 8px;
-        text-decoration: none;
-        font-weight: 600;
-        font-size: 16px;
-        transition: all 0.3s;
-        display: inline-block;
-    }
-    
-    .btn-primary {
-        background: white;
-        color: #667eea;
-    }
-    
-    .btn-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(255, 255, 255, 0.4);
-    }
-    
-    .btn-secondary {
-        background: rgba(255, 255, 255, 0.2);
-        color: white;
-        border: 2px solid white;
-    }
-    
-    .btn-secondary:hover {
-        background: rgba(255, 255, 255, 0.3);
-        transform: translateY(-2px);
-    }
-    
-    .features-section {
-        padding: 20px;
-    }
-    
-    .features-section h2 {
-        text-align: center;
-        font-size: 2.5rem;
-        margin-bottom: 40px;
-        color: #333;
-    }
-    
-    .features-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 30px;
-    }
-    
-    .feature-card {
-        background: white;
-        padding: 30px;
-        border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        text-align: center;
-        transition: transform 0.3s, box-shadow 0.3s;
-    }
-    
-    .feature-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-    }
-    
-    .feature-icon {
-        font-size: 3rem;
-        margin-bottom: 15px;
-    }
-    
-    .feature-card h3 {
-        color: #667eea;
-        margin-bottom: 10px;
-        font-size: 1.5rem;
-    }
-    
-    .feature-card p {
-        color: #666;
-        line-height: 1.6;
-    }
-    
-    @@media (max-width: 768px) {
-        .hero-title {
-            font-size: 2rem;
-        }
-        
-        .hero-subtitle {
-            font-size: 1.2rem;
-        }
-        
-        .cta-buttons {
-            flex-direction: column;
-            align-items: center;
-        }
+        padding: 0 20px;
     }
 </style>
 
-@code {
-    private bool isAuthenticated = false;
-    private Models.UserInfo? currentUser = null;
-    
-    protected override async Task OnInitializedAsync()
-    {
-        isAuthenticated = await AuthService.IsAuthenticatedAsync();
-        
-        if (isAuthenticated)
-        {
-            currentUser = await AuthService.GetCurrentUserAsync();
-        }
-    }
-}

@@ -1,0 +1,132 @@
+@page "/cart"
+@inject IBasketService BasketService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<div class="cart-page-container">
+    <div class="cart-header">
+        <h1>Giỏ Hàng Của Bạn</h1>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="cart-loading">
+            <div class="spinner"></div>
+            <p>Đang tải giỏ hàng...</p>
+        </div>
+    }
+    else if (basket == null || !basket.Items.Any())
+    {
+        <div class="empty-cart">
+            <i class="fa-solid fa-cart-shopping"></i>
+            <h2>Giỏ hàng của bạn đang trống</h2>
+            <p>Hãy dạo quanh một vòng và chọn cho mình những món đồ thật đẹp nhé!</p>
+            <button @onclick="GoHome" class="btn-shopping">TIẾP TỤC MUA SẮM</button>
+        </div>
+    }
+    else
+    {
+        <div class="cart-content">
+            <div class="cart-items-list">
+                <div class="list-header">
+                    <span>Sản phẩm</span>
+                    <span>Đơn giá</span>
+                    <span>Số lượng</span>
+                    <span>Thành tiền</span>
+                    <span></span>
+                </div>
+
+                @foreach (var item in basket.Items)
+                {
+                    <div class="cart-item">
+                        <div class="item-info">
+                            <img src="@(string.IsNullOrEmpty(item.ImageUrl) ? "/images/placeholder-product.jpg" : item.ImageUrl)" alt="@item.ProductName" />
+                            <div class="item-details">
+                                <span class="item-name">@item.ProductName</span>
+                            </div>
+                        </div>
+
+                        <div class="item-price">@item.Price.ToString("N0") đ</div>
+
+                        <div class="item-quantity">
+                            <div class="quantity-control">
+                                <button class="q-btn" @onclick="() => UpdateQuantity(item, -1)">-</button>
+                                <span class="q-val">@item.Quantity</span>
+                                <button class="q-btn" @onclick="() => UpdateQuantity(item, 1)" disabled="@(item.Quantity >= item.StockQuantity)">+</button>
+                            </div>
+                        </div>
+
+                        <div class="item-total">@((item.Price * item.Quantity).ToString("N0")) đ</div>
+
+                        <div class="item-remove">
+                            <button class="remove-btn" @onclick="() => RemoveItem(item.ProductId)">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="cart-summary">
+                <h3>Tóm tắt đơn hàng</h3>
+                <div class="summary-line">
+                    <span>Tổng số lượng:</span>
+                    <span>@basket.TotalItems</span>
+                </div>
+                <div class="summary-line total">
+                    <span>Tổng cộng:</span>
+                    <span class="total-price">@basket.TotalPrice.ToString("N0") đ</span>
+                </div>
+                
+                <button class="btn-checkout" @onclick="GoToCheckout">THANH TOÁN NGAY</button>
+                <button class="btn-continue" @onclick="GoHome">TIẾP TỤC MUA HÀNG</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private CustomerBasket? basket;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        BasketService.OnChange += HandleBasketChange;
+        await LoadBasket();
+    }
+
+    private async Task LoadBasket()
+    {
+        isLoading = true;
+        basket = await BasketService.GetBasketAsync();
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async void HandleBasketChange()
+    {
+        await LoadBasket();
+    }
+
+    private async Task UpdateQuantity(BasketItem item, int change)
+    {
+        var newQuantity = item.Quantity + change;
+        if (newQuantity >= 0)
+        {
+            await BasketService.UpdateQuantityAsync(item.ProductId, newQuantity);
+        }
+    }
+
+    private async Task RemoveItem(Guid productId)
+    {
+        await BasketService.RemoveFromBasketAsync(productId);
+    }
+
+    private void GoHome() => Navigation.NavigateTo("/");
+    private void GoToCheckout() => Navigation.NavigateTo("/checkout");
+
+    public void Dispose()
+    {
+        BasketService.OnChange -= HandleBasketChange;
+    }
+}

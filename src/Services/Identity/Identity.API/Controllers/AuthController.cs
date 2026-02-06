@@ -90,12 +90,12 @@ namespace Identity.API.Controllers
         {
             try
             {
-                // Find user by email
-                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+                // Find user by email or username (FullName)
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.UserIdentifier || u.FullName == request.UserIdentifier);
                 
                 if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
                 {
-                    return Unauthorized(new { message = "Invalid email or password" });
+                    return Unauthorized(new { message = "Tên đăng nhập hoặc mật khẩu không chính xác." });
                 }
                 
                 // Generate JWT token

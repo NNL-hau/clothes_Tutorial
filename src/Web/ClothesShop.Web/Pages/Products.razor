@@ -1,0 +1,44 @@
+@page "/products"
+@using Microsoft.AspNetCore.Components
+
+<div class="products-page">
+    <div class="container">
+        <ProductList Title="@PageTitle" InitialCount="12" CategoryKeyword="@Keyword" />
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "keyword")]
+    public string? Keyword { get; set; }
+
+    private string PageTitle => GetPageTitle();
+
+    private string GetPageTitle()
+    {
+        if (string.IsNullOrEmpty(Keyword))
+            return "TẤT CẢ SẢN PHẨM";
+            
+        if (Keyword.Equals("nam", StringComparison.OrdinalIgnoreCase))
+            return "THỜI TRANG NAM";
+        if (Keyword.Equals("nữ", StringComparison.OrdinalIgnoreCase))
+            return "THỜI TRANG NỮ";
+        if (Keyword.Equals("đồng phục", StringComparison.OrdinalIgnoreCase))
+            return "THỜI TRANG ĐỒNG PHỤC";
+            
+        return $"SẢN PHẨM: {Keyword.ToUpper()}";
+    }
+}
+
+<style>
+    .products-page {
+        padding: 40px 0;
+        min-height: 60vh;
+    }
+    
+    .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 20px;
+    }
+</style>

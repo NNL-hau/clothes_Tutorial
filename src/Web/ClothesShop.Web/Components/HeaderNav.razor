@@ -1,6 +1,8 @@
 @inject IAuthService AuthService
+@inject IBasketService BasketService
 @inject NavigationManager Navigation
 @using ClothesShop.Web.Services
+@implements IDisposable
 
 <header class="main-header">
     <div class="header-container">
@@ -9,9 +11,9 @@
         </div>
         
         <nav class="main-nav">
-            <a href="/products?category=men" class="nav-item">ĐỒ NAM</a>
-            <a href="/products?category=women" class="nav-item">ĐỒ NỮ</a>
-            <a href="/products?category=uniform" class="nav-item">ĐỒNG PHỤC</a>
+            <a href="/products?keyword=nam" class="nav-item">ĐỒ NAM</a>
+            <a href="/products?keyword=nữ" class="nav-item">ĐỒ NỮ</a>
+            <a href="/products?keyword=đồng phục" class="nav-item">ĐỒNG PHỤC</a>
         </nav>
         
         <div class="header-actions">
@@ -68,20 +70,49 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Subscribe to events
+        AuthService.OnAuthStateChanged += HandleAuthStateChanged;
+        BasketService.OnChange += HandleBasketChange;
+        
+        await RefreshState();
+    }
+
+    private async Task RefreshState()
+    {
         isAuthenticated = await AuthService.IsAuthenticatedAsync();
         
         if (isAuthenticated)
         {
             currentUser = await AuthService.GetCurrentUserAsync();
         }
+        else
+        {
+            currentUser = null;
+        }
         
-        // TODO: Get cart count from CartService
-        cartCount = 0;
+        cartCount = await BasketService.GetBasketItemCountAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async void HandleAuthStateChanged()
+    {
+        await RefreshState();
+    }
+
+    private async void HandleBasketChange()
+    {
+        cartCount = await BasketService.GetBasketItemCountAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        AuthService.OnAuthStateChanged -= HandleAuthStateChanged;
+        BasketService.OnChange -= HandleBasketChange;
     }
 
     private void ToggleDropdown()
     {
-        Console.WriteLine($"[HeaderNav] ToggleDropdown called. Current: {showDropdown} -> {!showDropdown}");
         showDropdown = !showDropdown;
         StateHasChanged();
     }
@@ -89,6 +120,9 @@
     private async Task HandleLogout()
     {
         await AuthService.LogoutAsync();
+        cartCount = 0;
+        showDropdown = false;
+        StateHasChanged();
         Navigation.NavigateTo("/", true);
     }
 }

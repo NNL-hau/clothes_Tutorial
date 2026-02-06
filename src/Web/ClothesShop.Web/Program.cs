@@ -47,5 +47,12 @@ builder.Services.AddScoped<IUserApiService, UserApiService>();
 builder.Services.AddScoped<ICategoryApiService, CategoryApiService>();
 builder.Services.AddScoped<IReviewApiService, ReviewApiService>();
 builder.Services.AddScoped<IPaymentApiService, PaymentApiService>();
+builder.Services.AddScoped<IBasketService, BasketService>();
 
-await builder.Build().RunAsync();
+var host = builder.Build();
+
+// Initialize AuthService
+var authService = host.Services.GetRequiredService<IAuthService>();
+await authService.InitializeAsync();
+
+await host.RunAsync();

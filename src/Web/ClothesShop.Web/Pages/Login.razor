@@ -59,8 +59,8 @@
             <h1>Đăng nhập Tutorial</h1>
             
             <div class="input-wrapper">
-                <InputText @bind-Value="loginModel.Email" placeholder="Tên đăng nhập (Bắt buộc)" />
-                <div class="validation-error"><ValidationMessage For="@(() => loginModel.Email)" /></div>
+                <InputText @bind-Value="loginModel.UserIdentifier" placeholder="Tên đăng nhập (Bắt buộc)" />
+                <div class="validation-error"><ValidationMessage For="@(() => loginModel.UserIdentifier)" /></div>
             </div>
 
             <div class="input-wrapper">
@@ -69,6 +69,8 @@
             </div>
 
             <button type="submit" class="signin-btn" @onclick="() => isLoginSubmitted = true">ĐĂNG NHẬP</button>
+            
+            <a href="javascript:void(0)" class="forgot-password-link" @onclick="OpenForgotPasswordModal">Quên mật khẩu?</a>
             
             <span class="or-divider">hoặc đăng nhập bằng</span>
             
@@ -117,6 +119,120 @@
     </div>
 </div>
 
+<!-- Forgot Password Modal -->
+@if (showForgotPassword)
+{
+    <div class="forgot-password-overlay" @onclick="CloseForgotPasswordModal">
+        <div class="forgot-password-modal" @onclick:stopPropagation="true">
+            <button class="close-btn" @onclick="CloseForgotPasswordModal">✕</button>
+            
+            <h2>Quên mật khẩu?</h2>
+            <div class="step-indicator">
+                <div class="step @(forgotPasswordStep == 1 ? "active" : "") @(forgotPasswordStep > 1 ? "completed" : "")">
+                    <span class="step-number">1</span>
+                    <span class="step-label">Email</span>
+                </div>
+                <div class="step @(forgotPasswordStep == 2 ? "active" : "") @(forgotPasswordStep > 2 ? "completed" : "")">
+                    <span class="step-number">2</span>
+                    <span class="step-label">Xác nhận OTP</span>
+                </div>
+                <div class="step @(forgotPasswordStep == 3 ? "active" : "")">
+                    <span class="step-number">3</span>
+                    <span class="step-label">Mật khẩu mới</span>
+                </div>
+            </div>
+            
+            @if (forgotPasswordStep == 1)
+            {
+                <EditForm Model="@forgotPasswordModel" OnValidSubmit="HandleSendOtp" OnInvalidSubmit="HandleInvalidForgotPassword" class="forgot-password-form">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <p class="step-description">Nhập email đã đăng ký để nhận mã OTP</p>
+                    
+                    <div class="input-wrapper">
+                        <InputText @bind-Value="forgotPasswordModel.Username" placeholder="Tên đăng nhập của bạn" />
+                        <div class="validation-error"><ValidationMessage For="@(() => forgotPasswordModel.Username)" /></div>
+                    </div>
+
+                    <div class="input-wrapper">
+                        <InputText @bind-Value="forgotPasswordModel.Email" placeholder="Email của bạn" />
+                        <div class="validation-error"><ValidationMessage For="@(() => forgotPasswordModel.Email)" /></div>
+                    </div>
+                    
+                    <button type="submit" class="primary-btn">Gửi mã OTP</button>
+                    
+                    @if (!string.IsNullOrEmpty(forgotPasswordError))
+                    {
+                        <div class="error-msg">@forgotPasswordError</div>
+                    }
+                </EditForm>
+            }
+            else if (forgotPasswordStep == 2)
+            {
+                <EditForm Model="@verifyOtpModel" OnValidSubmit="HandleVerifyOtp" OnInvalidSubmit="HandleInvalidVerifyOtp" class="forgot-password-form">
+                    <DataAnnotationsValidator />
+                    
+                    @if (!string.IsNullOrEmpty(forgotPasswordError))
+                    {
+                        <div class="error-msg">@forgotPasswordError</div>
+                    }
+
+                    <p class="step-description">Nhập mã OTP đã được gửi đến email <br /><strong>@verifyOtpModel.Email</strong></p>
+                    
+                    <div class="input-wrapper">
+                        <InputText @bind-Value="verifyOtpModel.OtpCode" placeholder="Mã OTP (6 chữ số)" maxlength="6" />
+                        <div class="validation-error"><ValidationMessage For="@(() => verifyOtpModel.OtpCode)" /></div>
+                    </div>
+                    
+                    <div class="button-group">
+                        <button type="button" class="secondary-btn" @onclick="GoBackToStep1">Quay lại</button>
+                        <button type="submit" class="primary-btn">Xác nhận</button>
+                    </div>
+                    
+                    @if (!string.IsNullOrEmpty(forgotPasswordError))
+                    {
+                        <div class="error-msg">@forgotPasswordError</div>
+                    }
+                </EditForm>
+            }
+            else if (forgotPasswordStep == 3)
+            {
+                <EditForm Model="@resetPasswordModel" OnValidSubmit="HandleResetPassword" OnInvalidSubmit="HandleInvalidResetPassword" class="forgot-password-form">
+                    <DataAnnotationsValidator />
+                    
+                    @if (!string.IsNullOrEmpty(forgotPasswordError))
+                    {
+                        <div class="error-msg">@forgotPasswordError</div>
+                    }
+
+                    <p class="step-description">Tạo mật khẩu mới cho tài khoản của bạn</p>
+                    
+                    <div class="input-wrapper">
+                        <InputText type="password" @bind-Value="resetPasswordModel.NewPassword" placeholder="Mật khẩu mới" />
+                        <div class="validation-error"><ValidationMessage For="@(() => resetPasswordModel.NewPassword)" /></div>
+                    </div>
+                    
+                    <div class="input-wrapper">
+                        <InputText type="password" @bind-Value="resetPasswordModel.ConfirmPassword" placeholder="Xác nhận mật khẩu mới" />
+                        <div class="validation-error"><ValidationMessage For="@(() => resetPasswordModel.ConfirmPassword)" /></div>
+                    </div>
+                    
+                    <button type="submit" class="primary-btn">Đặt lại mật khẩu</button>
+                    
+                    @if (!string.IsNullOrEmpty(forgotPasswordError))
+                    {
+                        <div class="error-msg">@forgotPasswordError</div>
+                    }
+                    @if (!string.IsNullOrEmpty(forgotPasswordSuccess))
+                    {
+                        <div class="success-msg">@forgotPasswordSuccess</div>
+                    }
+                </EditForm>
+            }
+        </div>
+    </div>
+}
+
 @code {
     private bool isSignUp = false;
     private bool isRegisterSubmitted = false;
@@ -127,6 +243,15 @@
     private string? registerError;
     private string? successMessage;
     private static Login? _instance;
+    
+    // Forgot password state
+    private bool showForgotPassword = false;
+    private int forgotPasswordStep = 1;
+    private ForgotPasswordModel forgotPasswordModel = new();
+    private VerifyOtpModel verifyOtpModel = new();
+    private ResetPasswordModel resetPasswordModel = new();
+    private string? forgotPasswordError;
+    private string? forgotPasswordSuccess;
 
     protected override void OnInitialized()
     {
@@ -163,6 +288,12 @@
         {
             loginError = ex.Message;
             StateHasChanged();
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2000);
+                loginError = null;
+                await InvokeAsync(StateHasChanged);
+            });
         }
     }
 
@@ -190,6 +321,12 @@
         catch (Exception ex)
         {
             loginError = ex.Message;
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2000);
+                loginError = null;
+                await InvokeAsync(StateHasChanged);
+            });
         }
     }
 
@@ -204,12 +341,8 @@
             {
                 isSignUp = false; // Switch to login
                 loginError = null; // Clear error
-                // Use a temporary success flag or message variable if preferred, 
-                // but for now, let's just use loginError with a specific prefix or handle it via a new variable.
-                // Refactoring to use a separate variable 'successMessage' would be cleaner.
                 successMessage = "Đăng ký thành công! Mời bạn đăng nhập.";
                 
-                // Auto-dismiss success message after 2 seconds
                 _ = Task.Run(async () =>
                 {
                     await Task.Delay(2000);
@@ -227,6 +360,160 @@
                 registerError = "⚠️ Không thể kết nối tới Backend (Localhost:5001). " + 
                                "Hãy đảm bảo 'docker-compose up' đang chạy hoặc project 'Identity.API' đang chạy ở cổng 5001.";
             }
+
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2000);
+                registerError = null;
+                await InvokeAsync(StateHasChanged);
+            });
         }
+    }
+    
+    // Forgot password methods
+    private void OpenForgotPasswordModal()
+    {
+        showForgotPassword = true;
+        forgotPasswordStep = 1;
+        forgotPasswordModel = new();
+        verifyOtpModel = new();
+        resetPasswordModel = new();
+        forgotPasswordError = null;
+        forgotPasswordSuccess = null;
+    }
+    
+    private void CloseForgotPasswordModal()
+    {
+        showForgotPassword = false;
+        forgotPasswordStep = 1;
+        forgotPasswordError = null;
+        forgotPasswordSuccess = null;
+    }
+    
+    private void HandleInvalidForgotPassword()
+    {
+        forgotPasswordError = "Vui lòng nhập đầy đủ Tên đăng nhập và Email";
+        TriggerErrorHide();
+    }
+
+    private void HandleInvalidVerifyOtp()
+    {
+        forgotPasswordError = "Vui lòng nhập đủ 6 số cho mã OTP";
+        TriggerErrorHide();
+    }
+
+    private void HandleInvalidResetPassword()
+    {
+        if (string.IsNullOrWhiteSpace(resetPasswordModel.NewPassword) || string.IsNullOrWhiteSpace(resetPasswordModel.ConfirmPassword))
+        {
+            forgotPasswordError = "Vui lòng nhập đầy đủ thông tin";
+        }
+        else if (resetPasswordModel.NewPassword != resetPasswordModel.ConfirmPassword)
+        {
+            forgotPasswordError = "Mật khẩu xác nhận không khớp";
+        }
+        else if (resetPasswordModel.NewPassword.Length < 6)
+        {
+            forgotPasswordError = "Mật khẩu phải có ít nhất 6 ký tự";
+        }
+        else
+        {
+            forgotPasswordError = "Vui lòng nhập đầy đủ thông tin";
+        }
+        TriggerErrorHide();
+    }
+
+    private void TriggerErrorHide()
+    {
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(1000);
+            forgotPasswordError = null;
+            await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private async Task HandleSendOtp()
+    {
+        forgotPasswordError = null;
+        try
+        {
+            await AuthService.SendOtpAsync(forgotPasswordModel.Username, forgotPasswordModel.Email);
+            verifyOtpModel.Email = forgotPasswordModel.Email;
+            forgotPasswordStep = 2;
+        }
+        catch (Exception ex)
+        {
+            forgotPasswordError = ex.Message;
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1000);
+                forgotPasswordError = null;
+                await InvokeAsync(StateHasChanged);
+            });
+        }
+    }
+    
+    private async Task HandleVerifyOtp()
+    {
+        forgotPasswordError = null;
+        try
+        {
+            await AuthService.VerifyOtpAsync(verifyOtpModel.Email, verifyOtpModel.OtpCode);
+            resetPasswordModel.Email = verifyOtpModel.Email;
+            resetPasswordModel.OtpCode = verifyOtpModel.OtpCode;
+            forgotPasswordStep = 3;
+        }
+        catch (Exception ex)
+        {
+            forgotPasswordError = ex.Message;
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1000);
+                forgotPasswordError = null;
+                await InvokeAsync(StateHasChanged);
+            });
+        }
+    }
+    
+    private async Task HandleResetPassword()
+    {
+        forgotPasswordError = null;
+        forgotPasswordSuccess = null;
+        try
+        {
+            await AuthService.ResetPasswordAsync(
+                resetPasswordModel.Email, 
+                resetPasswordModel.OtpCode, 
+                resetPasswordModel.NewPassword);
+            
+            forgotPasswordSuccess = "✅ Mật khẩu đã được đặt lại thành công!";
+            
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2000);
+                await InvokeAsync(() =>
+                {
+                    CloseForgotPasswordModal();
+                    StateHasChanged();
+                });
+            });
+        }
+        catch (Exception ex)
+        {
+            forgotPasswordError = ex.Message;
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(3000);
+                forgotPasswordError = null;
+                await InvokeAsync(StateHasChanged);
+            });
+        }
+    }
+    
+    private void GoBackToStep1()
+    {
+        forgotPasswordStep = 1;
+        forgotPasswordError = null;
     }
 }
