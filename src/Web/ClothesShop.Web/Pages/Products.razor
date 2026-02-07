@@ -1,44 +1,415 @@
 @page "/products"
 @using Microsoft.AspNetCore.Components
+@inject NavigationManager Navigation
+@inject ICategoryApiService CategoryService
 
 <div class="products-page">
-    <div class="container">
-        <ProductList Title="@PageTitle" InitialCount="12" CategoryKeyword="@Keyword" />
+    <div class="container main-layout">
+        <aside class="filters-sidebar">
+            <div class="filter-section">
+                <h3>TÌM KIẾM THEO TÊN</h3>
+                <div class="search-input-group">
+                    <input type="text" @bind="tempSearch" placeholder="Tên sản phẩm..." @onkeyup="HandleKeyUp" />
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <h3>DANH MỤC</h3>
+                <div class="category-list">
+                    <div class="category-item @(string.IsNullOrEmpty(tempCategory) ? "active" : "")" 
+                         @onclick='() => SelectCategory("")'>
+                        Tất cả danh mục
+                    </div>
+                    @if (categories != null)
+                    {
+                        var displayedCategories = showAllCategories ? categories : categories.Take(5).ToList();
+                        @foreach (var cat in displayedCategories)
+                        {
+                            <div class="category-item @(tempCategory == cat.Name ? "active" : "")" 
+                                 @onclick="() => SelectCategory(cat.Name)">
+                                @cat.Name
+                            </div>
+                        }
+
+                        @if (categories.Count > 5)
+                        {
+                            <div class="expand-toggle" @onclick="() => showAllCategories = !showAllCategories">
+                                <span>@(showAllCategories ? "Thu gọn" : "Xem thêm")</span>
+                                <i class="fa-solid fa-chevron-down @(showAllCategories ? "rotate-180" : "")"></i>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <h3>KHOẢNG GIÁ</h3>
+                <div class="price-inputs">
+                    <input type="number" @bind="minPrice" placeholder="Từ" />
+                    <span class="divider">-</span>
+                    <input type="number" @bind="maxPrice" placeholder="Đến" />
+                </div>
+                <div class="sort-buttons">
+                    <button class="sort-btn @(tempSortOrder == "price_asc" ? "active" : "")" @onclick='() => SetSortOrder("price_asc")'>
+                        <i class="fa-solid fa-arrow-up-wide-short me-1"></i> Giá tăng dần
+                    </button>
+                    <button class="sort-btn @(tempSortOrder == "price_desc" ? "active" : "")" @onclick='() => SetSortOrder("price_desc")'>
+                        <i class="fa-solid fa-arrow-down-wide-short me-1"></i> Giá giảm dần
+                    </button>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <h3>TRẠNG THÁI</h3>
+                <label class="checkbox-container">
+                    <input type="checkbox" @bind="inStockOnly" />
+                    <span class="checkmark"></span>
+                    Chỉ sản phẩm còn hàng
+                </label>
+            </div>
+
+            <button class="btn-filter" @onclick="ApplyFilters">ÁP DỤNG BỘ LỌC</button>
+            <button class="btn-reset" @onclick="ResetFilters">XÓA TẤT CẢ</button>
+        </aside>
+
+        <main class="products-content">
+            <ProductList Title="@PageTitle" 
+                         InitialCount="12" 
+                         CategoryKeyword="@CategoryName"
+                         SearchKeyword="@SearchKeyword"
+                         MinPrice="@appliedMinPrice"
+                         MaxPrice="@appliedMaxPrice"
+                         InStockOnly="@appliedInStockOnly"
+                         SortOrder="@appliedSortOrder" />
+        </main>
     </div>
 </div>
 
 @code {
     [Parameter]
-    [SupplyParameterFromQuery(Name = "keyword")]
-    public string? Keyword { get; set; }
+    [SupplyParameterFromQuery(Name = "search")]
+    public string? SearchKeyword { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "category")]
+    public string? CategoryName { get; set; }
+
+    private List<CategoryDto> categories = new();
+    private string? tempSearch;
+    private string? tempCategory;
+    private bool showAllCategories = false;
+    
+    private decimal? minPrice;
+    private decimal? maxPrice;
+    private bool inStockOnly;
+    private string? tempSortOrder;
+
+    private decimal? appliedMinPrice;
+    private decimal? appliedMaxPrice;
+    private bool appliedInStockOnly;
+    private string? appliedSortOrder;
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await CategoryService.GetCategoriesAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        tempSearch = SearchKeyword;
+        tempCategory = CategoryName;
+    }
+
+    private void SelectCategory(string categoryName)
+    {
+        tempCategory = categoryName;
+    }
+
+    private void SetSortOrder(string order)
+    {
+        if (tempSortOrder == order)
+            tempSortOrder = null;
+        else
+            tempSortOrder = order;
+    }
+
+    private void HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            ApplyFilters();
+        }
+    }
+
+    private void ApplyFilters()
+    {
+        var queryParams = new Dictionary<string, object?>();
+        
+        if (!string.IsNullOrEmpty(tempSearch))
+            queryParams["search"] = tempSearch;
+            
+        if (!string.IsNullOrEmpty(tempCategory))
+            queryParams["category"] = tempCategory;
+
+        var url = Navigation.GetUriWithQueryParameters(queryParams);
+        Navigation.NavigateTo(url);
+        
+        appliedMinPrice = minPrice;
+        appliedMaxPrice = maxPrice;
+        appliedInStockOnly = inStockOnly;
+        appliedSortOrder = tempSortOrder;
+        StateHasChanged();
+    }
+
+    private void ResetFilters()
+    {
+        tempSearch = null;
+        tempCategory = null;
+        minPrice = null;
+        maxPrice = null;
+        inStockOnly = false;
+        tempSortOrder = null;
+        
+        Navigation.NavigateTo("/products");
+        
+        appliedMinPrice = null;
+        appliedMaxPrice = null;
+        appliedInStockOnly = false;
+        appliedSortOrder = null;
+    }
 
     private string PageTitle => GetPageTitle();
 
     private string GetPageTitle()
     {
-        if (string.IsNullOrEmpty(Keyword))
+        var titles = new List<string>();
+        
+        if (!string.IsNullOrEmpty(CategoryName))
+            titles.Add(CategoryName.ToUpper());
+            
+        if (!string.IsNullOrEmpty(SearchKeyword))
+            titles.Add($"TÌM KIẾM: \"{SearchKeyword}\"");
+
+        if (titles.Count == 0)
             return "TẤT CẢ SẢN PHẨM";
             
-        if (Keyword.Equals("nam", StringComparison.OrdinalIgnoreCase))
-            return "THỜI TRANG NAM";
-        if (Keyword.Equals("nữ", StringComparison.OrdinalIgnoreCase))
-            return "THỜI TRANG NỮ";
-        if (Keyword.Equals("đồng phục", StringComparison.OrdinalIgnoreCase))
-            return "THỜI TRANG ĐỒNG PHỤC";
-            
-        return $"SẢN PHẨM: {Keyword.ToUpper()}";
+        return string.Join(" - ", titles);
     }
 }
 
 <style>
     .products-page {
         padding: 40px 0;
-        min-height: 60vh;
+        min-height: 80vh;
+        background-color: #f9f9f9;
     }
     
-    .container {
+    .container.main-layout {
         max-width: 1400px;
         margin: 0 auto;
         padding: 0 20px;
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 40px;
+    }
+
+    .filters-sidebar {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        height: fit-content;
+        position: sticky;
+        top: 80px;
+    }
+
+    .filter-section {
+        margin-bottom: 30px;
+    }
+
+    .filter-section h3 {
+        font-size: 14px;
+        font-weight: 700;
+        color: #2F4858;
+        margin-bottom: 15px;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 8px;
+        letter-spacing: 0.5px;
+    }
+
+    .search-input-group input {
+        width: 100%;
+        padding: 10px 15px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: border-color 0.3s;
+    }
+
+    .search-input-group input:focus {
+        border-color: #2F4858;
+        outline: none;
+    }
+
+    .category-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .category-item {
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        color: #555;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+    }
+
+    .category-item:hover {
+        background-color: #f5f5f5;
+        color: #2F4858;
+    }
+
+    .category-item.active {
+        background-color: #2F4858;
+        color: white;
+        font-weight: 600;
+    }
+
+    .expand-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px;
+        margin-top: 5px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #2F4858;
+        cursor: pointer;
+        transition: all 0.2s;
+        border-radius: 6px;
+    }
+
+    .expand-toggle:hover {
+        background-color: #f0f0f0;
+    }
+
+    .expand-toggle i {
+        font-size: 11px;
+        transition: transform 0.3s ease;
+    }
+
+    .rotate-180 {
+        transform: rotate(180deg);
+    }
+
+    .price-inputs {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .price-inputs input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+
+    .divider {
+        color: #999;
+    }
+
+    .sort-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 15px;
+    }
+
+    .sort-btn {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: white;
+        color: #555;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: left;
+        display: flex;
+        align-items: center;
+    }
+
+    .sort-btn:hover {
+        background: #f9f9f9;
+        border-color: #2F4858;
+        color: #2F4858;
+    }
+
+    .sort-btn.active {
+        background: #2F4858;
+        color: white;
+        border-color: #2F4858;
+    }
+
+    .checkbox-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+        color: #555;
+        cursor: pointer;
+    }
+
+    .btn-filter {
+        width: 100%;
+        background: #2F4858;
+        color: white;
+        border: none;
+        padding: 12px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.3s;
+        margin-bottom: 10px;
+    }
+
+    .btn-filter:hover {
+        background: #3e5e73;
+    }
+
+    .btn-reset {
+        width: 100%;
+        background: #f0f0f0;
+        color: #666;
+        border: none;
+        padding: 12px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+
+    .btn-reset:hover {
+        background: #e5e5e5;
+    }
+
+    @@media (max-width: 992px) {
+        .container.main-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .filters-sidebar {
+            position: relative;
+            top: 0;
+            margin-bottom: 30px;
+        }
     }
 </style>

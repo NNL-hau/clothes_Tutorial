@@ -11,12 +11,21 @@
         </div>
         
         <nav class="main-nav">
-            <a href="/products?keyword=nam" class="nav-item">ĐỒ NAM</a>
-            <a href="/products?keyword=nữ" class="nav-item">ĐỒ NỮ</a>
-            <a href="/products?keyword=đồng phục" class="nav-item">ĐỒNG PHỤC</a>
+            <a href="/products?category=nam" class="nav-item">ĐỒ NAM</a>
+            <a href="/products?category=nữ" class="nav-item">ĐỒ NỮ</a>
+            <a href="/products?category=đồng phục" class="nav-item">ĐỒNG PHỤC</a>
         </nav>
         
         <div class="header-actions">
+            <div class="search-bar">
+                <input type="text" placeholder="Tìm kiếm sản phẩm..." 
+                       @bind="searchKeyword" 
+                       @onkeyup="HandleKeyUp" />
+                <button @onclick="HandleSearch">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </button>
+            </div>
+
             @if (isAuthenticated && currentUser != null)
             {
                 <div class="account-dropdown">
@@ -34,6 +43,10 @@
                                 <small style="color: #666 !important;">@currentUser.Email</small>
                             </div>
                             <div style="height: 1px; background: #eee; margin: 5px 0;"></div>
+                            <a href="/profile" class="dropdown-item" @onclick="ToggleDropdown">
+                                <i class="fa-solid fa-user-gear me-2"></i>
+                                <span>Thông tin tài khoản</span>
+                            </a>
                             <button class="dropdown-item logout-btn" @onclick="HandleLogout" style="display: flex !important; width: 100% !important;">
                                 <i class="fa-solid fa-right-from-bracket me-2"></i>
                                 <span>Đăng xuất</span>
@@ -67,6 +80,7 @@
     private Models.UserInfo? currentUser = null;
     private bool showDropdown = false;
     private int cartCount = 0;
+    private string searchKeyword = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -124,5 +138,22 @@
         showDropdown = false;
         StateHasChanged();
         Navigation.NavigateTo("/", true);
+    }
+
+    private void HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            HandleSearch();
+        }
+    }
+
+    private void HandleSearch()
+    {
+        if (!string.IsNullOrWhiteSpace(searchKeyword))
+        {
+            Navigation.NavigateTo($"/products?search={Uri.EscapeDataString(searchKeyword)}");
+            searchKeyword = "";
+        }
     }
 }

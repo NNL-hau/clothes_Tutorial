@@ -54,4 +54,11 @@ namespace Identity.API.DTOs
         public string? Address { get; set; }
         public DateTime CreatedAt { get; set; }
     }
+
+    public class UpdateProfileRequest
+    {
+        public string? PhoneNumber { get; set; }
+        public string? Address { get; set; }
+        public string? NewPassword { get; set; }
+    }
 }

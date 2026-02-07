@@ -1,0 +1,434 @@
+@page "/profile"
+@using ClothesShop.Web.Models
+@using ClothesShop.Web.Services
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+
+<div class="profile-page">
+    <div class="container container-sm">
+        <div class="profile-card">
+            <div class="profile-header">
+                <h2>THÔNG TIN TÀI KHOẢN</h2>
+            </div>
+
+            @if (isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Đang tải...</span>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <EditForm Model="@updateModel" OnValidSubmit="HandleUpdate">
+                    <DataAnnotationsValidator />
+
+                    <div class="form-section">
+                        <div class="form-group mb-4">
+                            <label class="form-label">Tên đăng nhập</label>
+                            <input type="text" class="form-control readonly-input" value="@currentUser?.FullName" readonly />
+                        </div>
+
+                        <div class="form-group mb-4">
+                            <label class="form-label">Email</label>
+                            <input type="text" class="form-control readonly-input" value="@currentUser?.Email" readonly />
+                        </div>
+
+                        <div class="form-group mb-4">
+                            <label class="form-label">Số điện thoại</label>
+                            <input type="text" class="form-control" @bind-value="updateModel.PhoneNumber" placeholder="Số điện thoại của bạn" />
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label">Tỉnh / Thành phố</label>
+                                <select class="form-select" @onchange="OnProvinceChanged">
+                                    <option value="">Tỉnh / Thành phố</option>
+                                    @foreach (var province in provinces)
+                                    {
+                                        <option value="@province" selected="@(selectedProvince == province)">@province</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Quận / Huyện</label>
+                                <select class="form-select" @onchange="OnDistrictChanged" disabled="@(string.IsNullOrEmpty(selectedProvince))">
+                                    <option value="">Quận / Huyện</option>
+                                    @foreach (var district in currentDistricts)
+                                    {
+                                        <option value="@district" selected="@(selectedDistrict == district)">@district</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Phường / Xã</label>
+                                <select class="form-select" @bind="selectedWard" disabled="@(string.IsNullOrEmpty(selectedDistrict))">
+                                    <option value="">Phường / Xã</option>
+                                    @foreach (var ward in currentWards)
+                                    {
+                                        <option value="@ward" selected="@(selectedWard == ward)">@ward</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group mb-4">
+                            <label class="form-label">Địa chỉ chi tiết</label>
+                            <input type="text" class="form-control" @bind-value="detailAddress" placeholder="Nhập chi tiết địa chỉ" />
+                        </div>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div class="form-section">
+                        <h3 class="section-title">THAY ĐỔI MẬT KHẨU</h3>
+                        <p class="text-muted mb-3" style="font-size: 0.85rem;">Để trống nếu không muốn thay đổi mật khẩu</p>
+
+                        <div class="form-group mb-4">
+                            <label class="form-label">Mật khẩu mới</label>
+                            <input type="password" class="form-control" @bind-value="updateModel.NewPassword" placeholder="Nhập mật khẩu mới" />
+                        </div>
+
+                        <div class="form-group mb-4">
+                            <label class="form-label">Xác nhận mật khẩu mới</label>
+                            <input type="password" class="form-control" @bind-value="updateModel.ConfirmPassword" placeholder="Xác nhận mật khẩu" />
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger mb-4">@errorMessage</div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(successMessage))
+                    {
+                        <div class="alert alert-success mb-4">@successMessage</div>
+                    }
+
+                    <div class="actions">
+                        <button type="submit" class="btn btn-save" disabled="@isSubmitting">
+                            @if (isSubmitting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            }
+                            LƯU THAY ĐỔI
+                        </button>
+                    </div>
+                </EditForm>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private UserInfo? currentUser;
+    private UpdateProfileModel updateModel = new();
+    private bool isLoading = true;
+    private bool isSubmitting = false;
+    private string? errorMessage;
+    private string? successMessage;
+
+    // Address fields
+    private string selectedProvince = "";
+    private string selectedDistrict = "";
+    private string selectedWard = "";
+    private string detailAddress = "";
+
+    private List<string> provinces = new() { 
+        "Hà Nội", "Hồ Chí Minh", "Đà Nẵng", "Hải Phòng", "Cần Thơ", 
+        "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu", 
+        "Bắc Ninh", "Bến Tre", "Bình Định", "Bình Dương", "Bình Phước", 
+        "Bình Thuận", "Cà Mau", "Cao Bằng", "Đắk Lắk", "Đắk Nông", 
+        "Điện Biên", "Đồng Nai", "Đồng Tháp", "Gia Lai", "Hà Giang", 
+        "Hà Nam", "Hà Tĩnh", "Hải Dương", "Hậu Giang", "Hòa Bình", 
+        "Hưng Yên", "Khánh Hòa", "Kiên Giang", "Kon Tum", "Lai Châu", 
+        "Lâm Đồng", "Lạng Sơn", "Lào Cai", "Long An", "Nam Định", 
+        "Nghệ An", "Ninh Bình", "Ninh Thuận", "Phú Thọ", "Quảng Bình", 
+        "Quảng Nam", "Quảng Ngãi", "Quảng Ninh", "Quảng Trị", "Sóc Trăng", 
+        "Sơn La", "Tây Ninh", "Thái Bình", "Thái Nguyên", "Thanh Hóa", 
+        "Thừa Thiên Huế", "Tiền Giang", "Trà Vinh", "Tuyên Quang", "Vĩnh Long", 
+        "Vĩnh Phúc", "Yên Bái", "Phú Yên"
+    };
+
+    private Dictionary<string, List<string>> districts = new() {
+        { "Hà Nội", new() { "Ba Đình", "Hoàn Kiếm", "Tây Hồ", "Long Biên", "Cầu Giấy", "Đống Đa", "Hai Bà Trưng", "Hoàng Mai", "Thanh Xuân", "Hà Đông", "Bắc Từ Liêm", "Nam Từ Liêm", "Thanh Trì", "Gia Lâm", "Đông Anh", "Sóc Sơn" } },
+        { "Hồ Chí Minh", new() { "Quận 1", "Quận 3", "Quận 4", "Quận 5", "Quận 6", "Quận 7", "Quận 8", "Quận 10", "Quận 11", "Quận 12", "Bình Tân", "Bình Thạnh", "Gò Vấp", "Phú Nhuận", "Tân Bình", "Tân Phú", "Thủ Đức", "Hóc Môn", "Củ Chi", "Nhà Bè" } },
+        { "Đà Nẵng", new() { "Hải Châu", "Thanh Khê", "Sơn Trà", "Ngũ Hành Sơn", "Liên Chiểu", "Cẩm Lệ", "Hòa Vang" } }
+    };
+
+    private Dictionary<string, List<string>> wards = new() {
+        // Hà Nội
+        { "Ba Đình", new() { "Cống Vị", "Điện Biên", "Đội Cấn", "Giảng Võ", "Kim Mã", "Liễu Giai", "Ngọc Hà", "Ngọc Khánh", "Nguyễn Trung Trực", "Quán Thánh", "Thành Công", "Trúc Bạch", "Vĩnh Phúc" } },
+        { "Hoàn Kiếm", new() { "Chương Dương", "Cửa Đông", "Cửa Nam", "Đồng Xuân", "Hàng Bạc", "Hàng Bài", "Hàng Bồ", "Hàng Bông", "Hàng Buồm", "Hàng Đào", "Hàng Gai", "Hàng Mã", "Hàng Trống", "Lý Thái Tổ", "Phan Chu Trinh", "Phúc Tân", "Trần Hưng Đạo", "Tràng Tiền" } },
+        { "Cầu Giấy", new() { "Dịch Vọng", "Dịch Vọng Hậu", "Mai Dịch", "Nghĩa Đô", "Nghĩa Tân", "Quan Hoa", "Trung Hòa", "Yên Hòa" } },
+        { "Đống Đa", new() { "Cát Linh", "Hàng Bột", "Khâm Thiên", "Khương Thượng", "Kim Liên", "Láng Hạ", "Láng Thượng", "Nam Đồng", "Ngã Tư Sở", "Ô Chợ Dừa", "Phương Liên", "Phương Mai", "Quang Trung", "Quốc Tử Giám", "Thịnh Quang", "Thổ Quan", "Trung Liệt", "Trung Phụng", "Trung Tự", "Văn Chương", "Văn Miếu" } },
+        
+        // Hồ Chí Minh
+        { "Quận 1", new() { "Bến Nghé", "Bến Thành", "Cô Giang", "Đa Kao", "Nguyễn Cư Trinh", "Nguyễn Thái Bình", "Phạm Ngũ Lão", "Tân Định" } },
+        { "Quận 3", new() { "Võ Thị Sáu", "Võ Văn Tần", "Phường 1", "Phường 2", "Phường 3", "Phường 4", "Phường 5" } },
+        { "Bình Thạnh", new() { "Phường 1", "Phường 2", "Phường 3", "Phường 5", "Phường 6", "Phường 7", "Phường 11", "Phường 12", "Phường 13", "Phường 14", "Phường 15", "Phường 17", "Phường 19", "Phường 21", "Phường 22", "Phường 24", "Phường 25", "Phường 26", "Phường 27", "Phường 28" } },
+        { "Gò Vấp", new() { "Phường 1", "Phường 3", "Phường 4", "Phường 5", "Phường 6", "Phường 7", "Phường 8", "Phường 9", "Phường 10", "Phường 11", "Phường 12", "Phường 13", "Phường 14", "Phường 15", "Phường 16", "Phường 17" } },
+
+        // Đà Nẵng
+        { "Hải Châu", new() { "Bình Hiên", "Bình Thuận", "Hải Châu I", "Hải Châu II", "Hòa Cường Bắc", "Hòa Cường Nam", "Hòa Thuận Đông", "Hòa Thuận Tây", "Nam Dương", "Phước Ninh", "Thạch Thang", "Thanh Bình", "Thuận Phước" } },
+        { "Thanh Khê", new() { "An Khê", "Chính Gián", "Hòa Khê", "Tam Thuận", "Tân Chính", "Thạc Gián", "Thanh Khê Đông", "Thanh Khê Tây", "Vĩnh Trung", "Xuân Hà" } }
+    };
+
+    private List<string> currentDistricts = new();
+    private List<string> currentWards = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserData();
+    }
+
+    private async Task LoadUserData()
+    {
+        isLoading = true;
+        currentUser = await AuthService.GetCurrentUserAsync();
+        
+        if (currentUser == null)
+        {
+            Navigation.NavigateTo("/login?returnUrl=/profile");
+            return;
+        }
+
+        updateModel.PhoneNumber = currentUser.PhoneNumber;
+        
+        // Simple parsing of existing address if possible
+        if (!string.IsNullOrEmpty(currentUser.Address))
+        {
+            var parts = currentUser.Address.Split(", ").Select(p => p.Trim()).ToList();
+            if (parts.Count >= 4)
+            {
+                detailAddress = parts[0];
+                selectedWard = parts[1];
+                selectedDistrict = parts[2];
+                selectedProvince = parts[3];
+                
+                UpdateDistricts();
+                UpdateWards();
+            }
+            else
+            {
+                detailAddress = currentUser.Address;
+            }
+        }
+        
+        isLoading = false;
+    }
+
+    private void OnProvinceChanged(ChangeEventArgs e)
+    {
+        selectedProvince = e.Value?.ToString() ?? "";
+        selectedDistrict = "";
+        selectedWard = "";
+        UpdateDistricts();
+    }
+
+    private void OnDistrictChanged(ChangeEventArgs e)
+    {
+        selectedDistrict = e.Value?.ToString() ?? "";
+        selectedWard = "";
+        UpdateWards();
+    }
+
+    private void UpdateDistricts()
+    {
+        if (districts.ContainsKey(selectedProvince))
+        {
+            currentDistricts = districts[selectedProvince];
+        }
+        else
+        {
+            currentDistricts = new List<string>();
+        }
+        currentWards = new List<string>();
+    }
+
+    private void UpdateWards()
+    {
+        if (wards.ContainsKey(selectedDistrict))
+        {
+            currentWards = wards[selectedDistrict];
+        }
+        else
+        {
+            currentWards = new List<string>();
+        }
+    }
+
+    private async Task HandleUpdate()
+    {
+        isSubmitting = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            // Consolidate address
+            if (!string.IsNullOrEmpty(selectedProvince))
+            {
+                updateModel.Address = $"{detailAddress}, {selectedWard}, {selectedDistrict}, {selectedProvince}";
+            }
+            else
+            {
+                updateModel.Address = detailAddress;
+            }
+
+            if (!string.IsNullOrEmpty(updateModel.NewPassword))
+            {
+                if (updateModel.NewPassword.Length < 6)
+                {
+                    throw new Exception("Mật khẩu phải có ít nhất 6 ký tự");
+                }
+                if (updateModel.NewPassword != updateModel.ConfirmPassword)
+                {
+                    throw new Exception("Mật khẩu xác nhận không khớp");
+                }
+            }
+
+            var result = await AuthService.UpdateProfileAsync(updateModel);
+            if (result)
+            {
+                successMessage = "Cập nhật thông tin thành công!";
+                updateModel.NewPassword = null;
+                updateModel.ConfirmPassword = null;
+                
+                _ = Task.Delay(2000).ContinueWith(_ => 
+                {
+                    successMessage = null;
+                    InvokeAsync(StateHasChanged);
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}
+
+<style>
+    .profile-page {
+        padding: 60px 0;
+        background-color: #f8f9fa;
+        min-height: calc(100vh - 60px);
+    }
+
+    .container-sm {
+        max-width: 700px;
+    }
+
+    .profile-card {
+        background: white;
+        padding: 40px;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    }
+
+    .profile-header h2 {
+        font-size: 24px;
+        font-weight: 700;
+        color: #2F4858;
+        text-align: center;
+        margin-bottom: 35px;
+        letter-spacing: 1px;
+    }
+
+    .section-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #2F4858;
+        margin-bottom: 10px;
+    }
+
+    .form-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #555;
+        margin-bottom: 8px;
+    }
+
+    .form-control, .form-select {
+        border-radius: 8px;
+        padding: 12px 16px;
+        border: 1.5px solid #eee;
+        transition: all 0.3s ease;
+        font-size: 15px;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #2F4858;
+        box-shadow: 0 0 0 3px rgba(47, 72, 88, 0.1);
+    }
+
+    .readonly-input {
+        background-color: #f9f9f9 !important;
+        cursor: not-allowed;
+        color: #888;
+        border-style: dashed;
+    }
+
+    .divider {
+        height: 1.5px;
+        background: #f0f0f0;
+        margin: 30px 0;
+    }
+
+    .btn-save {
+        width: 100%;
+        background-color: #2F4858;
+        color: white;
+        padding: 14px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 16px;
+        letter-spacing: 1px;
+        border: none;
+        transition: background 0.3s;
+        margin-top: 10px;
+    }
+
+    .btn-save:hover:not(:disabled) {
+        background-color: #3e5e73;
+        transform: translateY(-1px);
+    }
+
+    .btn-save:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .alert {
+        border-radius: 8px;
+        border: none;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .alert-success {
+        background-color: #d1e7dd;
+        color: #0f5132;
+    }
+
+    .alert-danger {
+        background-color: #f8d7da;
+        color: #842029;
+    }
+
+    @@media (max-width: 768px) {
+        .profile-card {
+            padding: 20px;
+        }
+        
+        .row > div {
+            margin-bottom: 15px;
+        }
+    }
+</style>

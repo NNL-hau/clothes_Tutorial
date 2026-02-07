@@ -23,6 +23,7 @@ namespace ClothesShop.Web.Services
         Task<bool> SendOtpAsync(string username, string email);
         Task<bool> VerifyOtpAsync(string email, string otpCode);
         Task<bool> ResetPasswordAsync(string email, string otpCode, string newPassword);
+        Task<bool> UpdateProfileAsync(UpdateProfileModel model);
     }
     
     public class AuthService : IAuthService
@@ -348,6 +349,46 @@ namespace ClothesShop.Web.Services
             catch (HttpRequestException)
             {
                 throw new Exception($"Không thể kết nối tới máy chủ Backend tại {_httpClient.BaseAddress}.");
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
+        }
+
+        public async Task<bool> UpdateProfileAsync(UpdateProfileModel model)
+        {
+            try
+            {
+                var token = await GetTokenAsync();
+                if (string.IsNullOrEmpty(token))
+                    throw new Exception("Vui lòng đăng nhập lại.");
+
+                _httpClient.DefaultRequestHeaders.Authorization = 
+                    new AuthenticationHeaderValue("Bearer", token);
+
+                var response = await _httpClient.PutAsJsonAsync("api/auth/profile", model);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    // Refresh local user info
+                    CurrentUser = await GetCurrentUserAsync();
+                    OnAuthStateChanged?.Invoke();
+                    return true;
+                }
+
+                var errorContent = await response.Content.ReadAsStringAsync();
+                try
+                {
+                    var doc = JsonDocument.Parse(errorContent);
+                    if (doc.RootElement.TryGetProperty("message", out var msg))
+                    {
+                        throw new Exception(msg.GetString());
+                    }
+                }
+                catch { }
+
+                throw new Exception(!string.IsNullOrEmpty(errorContent) ? errorContent : "Cập nhật thất bại");
             }
             catch (Exception ex)
             {

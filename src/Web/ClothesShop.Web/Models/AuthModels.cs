@@ -85,4 +85,12 @@ namespace ClothesShop.Web.Models
         [Compare("NewPassword", ErrorMessage = "Mật khẩu xác nhận không khớp")]
         public string ConfirmPassword { get; set; } = string.Empty;
     }
+
+    public class UpdateProfileModel
+    {
+        public string? PhoneNumber { get; set; }
+        public string? Address { get; set; }
+        public string? NewPassword { get; set; }
+        public string? ConfirmPassword { get; set; }
+    }
 }

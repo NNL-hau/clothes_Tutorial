@@ -207,5 +207,48 @@ namespace Identity.API.Controllers
                 return StatusCode(500, new { message = "An error occurred during Google login" });
             }
         }
+        /// <summary>
+        /// Update user profile (requires authentication)
+        /// </summary>
+        [HttpPut("profile")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
+        public async Task<ActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                
+                if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+                {
+                    return Unauthorized();
+                }
+                
+                var user = await _context.Users.FindAsync(userId);
+                
+                if (user == null)
+                {
+                    return NotFound(new { message = "User not found" });
+                }
+
+                // Update phone and address
+                if (request.PhoneNumber != null) user.PhoneNumber = request.PhoneNumber;
+                if (request.Address != null) user.Address = request.Address;
+
+                // Update password if provided
+                if (!string.IsNullOrEmpty(request.NewPassword))
+                {
+                    user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+                }
+
+                await _context.SaveChangesAsync();
+                
+                return Ok(new { message = "Cập nhật thông tin thành công" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating user profile");
+                return StatusCode(500, new { message = "An error occurred during profile update" });
+            }
+        }
     }
 }

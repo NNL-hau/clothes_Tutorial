@@ -1,0 +1,83 @@
+<footer class="site-footer">
+    <div class="footer-container">
+        <!-- Brand & Contact Section -->
+        <div class="footer-column brand-column">
+            <div class="footer-logo">CANIFA•S</div>
+            <p class="brand-description">
+                Cửa hàng <strong>CANIFA•S</strong> là một website cung cấp những mẫu thời trang hiện đại, 
+                chất lượng và phong cách dành cho mọi người.
+            </p>
+            </p>
+        </div>
+
+        <!-- Links Column 1 -->
+        <div class="footer-column">
+            <h3>Về chúng tôi</h3>
+            <ul class="footer-links">
+                <li><a href="/">Trang chủ</a></li>
+                <li><a href="/products">Sản phẩm</a></li>
+                <li><a href="#">Đặt hàng</a></li>
+            </ul>
+        </div>
+
+        <!-- Links Column 2 -->
+        <div class="footer-column">
+            <h3>Hỗ trợ khách hàng</h3>
+            <ul class="footer-links">
+                <li><a href="/">Trang chủ</a></li>
+                <li><a href="#">Giới thiệu</a></li>
+                <li><a href="/products">Sản phẩm</a></li>
+            </ul>
+        </div>
+
+        <!-- Newsletter & Payment Section -->
+        <div class="footer-column newsletter-column">
+            <div class="newsletter-header">
+                <div class="newsletter-icon">
+                    <i class="fa-solid fa-envelope-open-text"></i>
+                </div>
+                <div class="newsletter-title">
+                    <h3>Đăng ký</h3>
+                    <p>nhận thông tin khuyến mãi</p>
+                </div>
+            </div>
+            
+            <div class="newsletter-form">
+                <input type="email" placeholder="Email" @bind="email" />
+                <button type="button" @onclick="HandleSubscribe">Đăng ký</button>
+            </div>
+
+            <div class="payment-methods">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/d/d6/Visa_2014_logo_detail.svg" alt="Visa" />
+                <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" />
+                <img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" alt="PayPal" />
+                <img src="https://img1.wsimg.com/isteam/ip/91f63080-6925-455b-8007-88544923f15c/American%20Express%20Icon.png" alt="Amex" />
+                <img src="https://upload.wikimedia.org/wikipedia/commons/c/cb/JCB_logo.svg" alt="JCB" />
+            </div>
+        </div>
+
+        <!-- Full Width Map -->
+        <div class="footer-map">
+            <iframe 
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3723.8977453149246!2d105.81613417592383!3d21.0367!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3135ab41145303bb%3A0x1da7aae583f706fa!2zTMOqIERvYW4gS2nhu4duLCAyNjYgxJDhu5lpIEPhuqVuLCBMaeG7ZXUgR2lhaSwgQmEgxJDDrG5oLCBIw6AgTuG7mWksIFZpZXRuYW0!5e0!3m2!1svi!2s!4v1707248000000!5m2!1svi!2s" 
+                width="100%" height="300" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade">
+            </iframe>
+        </div>
+    </div>
+
+    <div class="footer-bottom">
+        <div class="container text-center">
+            <p>&copy; 2026 CANIFA•S - Tất cả quyền được bảo lưu.</p>
+        </div>
+    </div>
+</footer>
+
+@code {
+    private string email = "";
+
+    private void HandleSubscribe()
+    {
+        // Newsletter subscription logic would go here
+        email = "";
+    }
+}

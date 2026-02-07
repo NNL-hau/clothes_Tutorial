@@ -50,6 +50,21 @@
 
     [Parameter]
     public string? CategoryKeyword { get; set; }
+
+    [Parameter]
+    public string? SearchKeyword { get; set; }
+
+    [Parameter]
+    public decimal? MinPrice { get; set; }
+
+    [Parameter]
+    public decimal? MaxPrice { get; set; }
+
+    [Parameter]
+    public bool InStockOnly { get; set; }
+
+    [Parameter]
+    public string? SortOrder { get; set; } // "price_asc" or "price_desc"
     
     private List<ProductDto> products = new();
     private int DisplayCount { get; set; }
@@ -71,7 +86,9 @@
         try
         {
             var allProducts = await ProductService.GetProductsAsync();
+            var filteredProducts = allProducts;
             
+            // Filter by Category
             if (!string.IsNullOrEmpty(CategoryKeyword))
             {
                 var categories = await CategoryService.GetCategoriesAsync();
@@ -80,12 +97,45 @@
                     .Select(c => c.Id)
                     .ToList();
                 
-                products = allProducts.Where(p => targetCategoryIds.Contains(p.CategoryId)).ToList();
+                filteredProducts = filteredProducts.Where(p => targetCategoryIds.Contains(p.CategoryId)).ToList();
             }
-            else
+
+            // Filter by Search Keyword (Name)
+            if (!string.IsNullOrEmpty(SearchKeyword))
             {
-                products = allProducts;
+                filteredProducts = filteredProducts
+                    .Where(p => p.Name.Contains(SearchKeyword, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
             }
+
+            // Filter by Price Range
+            if (MinPrice.HasValue)
+            {
+                filteredProducts = filteredProducts.Where(p => p.Price >= MinPrice.Value).ToList();
+            }
+
+            if (MaxPrice.HasValue)
+            {
+                filteredProducts = filteredProducts.Where(p => p.Price <= MaxPrice.Value).ToList();
+            }
+
+            // Filter by Stock Status
+            if (InStockOnly)
+            {
+                filteredProducts = filteredProducts.Where(p => p.StockQuantity > 0).ToList();
+            }
+
+            // Sort products
+            if (SortOrder == "price_asc")
+            {
+                filteredProducts = filteredProducts.OrderBy(p => p.Price).ToList();
+            }
+            else if (SortOrder == "price_desc")
+            {
+                filteredProducts = filteredProducts.OrderByDescending(p => p.Price).ToList();
+            }
+
+            products = filteredProducts;
         }
         catch (Exception ex)
         {

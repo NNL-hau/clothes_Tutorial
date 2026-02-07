@@ -66,6 +66,54 @@
     gap: 25px;
 }
 
+.search-bar {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    padding: 4px 12px;
+    transition: all 0.3s ease;
+    width: 250px;
+}
+
+.search-bar:focus-within {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+    width: 300px;
+}
+
+.search-bar input {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 14px;
+    padding: 4px 8px;
+    width: 100%;
+    outline: none;
+}
+
+.search-bar input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.search-bar button {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    padding: 4px;
+    transition: color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.search-bar button:hover {
+    color: white;
+}
+
 .account-link,
 .cart-link {
     color: white;
@@ -233,5 +281,15 @@
 
     .account-name {
         display: none;
+    }
+
+    .search-bar {
+        width: 100%;
+        margin-bottom: 10px;
+        order: -1;
+    }
+
+    .search-bar:focus-within {
+        width: 100%;
     }
 }
