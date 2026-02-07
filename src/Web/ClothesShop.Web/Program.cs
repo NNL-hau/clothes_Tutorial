@@ -49,6 +49,11 @@ builder.Services.AddScoped<ICategoryApiService, CategoryApiService>();
 builder.Services.AddScoped<IReviewApiService, ReviewApiService>();
 builder.Services.AddScoped<IPaymentApiService, PaymentApiService>();
 builder.Services.AddScoped<IBasketService, BasketService>();
+builder.Services.AddScoped<IChatApiService, ChatApiService>(sp => 
+{
+    var client = sp.GetRequiredService<IHttpClientFactory>().CreateClient("CatalogApi");
+    return new ChatApiService(client);
+});
 
 var host = builder.Build();
 
