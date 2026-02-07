@@ -25,13 +25,21 @@ namespace Catalog.API.Controllers
                 .ToListAsync();
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<CategoryDto>> GetCategory(Guid id)
+        {
+            var category = await _context.Categories.FindAsync(id);
+            if (category == null) return NotFound();
+            return new CategoryDto(category.Id, category.Name, category.Description);
+        }
+
         [HttpPost]
         public async Task<ActionResult<CategoryDto>> CreateCategory(CreateCategoryDto dto)
         {
             var category = new Category { Name = dto.Name, Description = dto.Description };
             _context.Categories.Add(category);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetCategories), new { }, new CategoryDto(category.Id, category.Name, category.Description));
+            return CreatedAtAction(nameof(GetCategory), new { id = category.Id }, new CategoryDto(category.Id, category.Name, category.Description));
         }
 
         [HttpPut("{id}")]

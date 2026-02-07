@@ -10,7 +10,14 @@
     <PackageReference Include="Blazored.LocalStorage" Version="4.3.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="9.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="9.0.11" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.1" />
+    <PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="9.0.1" />
+  </ItemGroup>
+
+  <!-- Loại bỏ toàn bộ mã backend Payment_Service khỏi quá trình build Blazor (đây là thư viện backend mẫu, không dùng trên FE) -->
+  <ItemGroup>
+    <Compile Remove="Payment_Service\**\*.cs" />
+    <None Include="Payment_Service\**\*.cs" />
   </ItemGroup>
 
 </Project>

@@ -115,8 +115,11 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Server=clothes-db;Port=3306;Database=PaymentDb;User=root;Password=123456;
     ports:
       - "5005:80"
+    depends_on:
+      - clothes-db
     networks:
       - clothesshop-network
 

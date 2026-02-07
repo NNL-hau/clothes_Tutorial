@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace ClothesShop.Web.Models
 {
     public record TransactionDto(
@@ -7,6 +9,7 @@ namespace ClothesShop.Web.Models
         decimal Amount,
         string PaymentMethod,
         string Status,
-        DateTime CreatedAt
+        DateTime CreatedAt,
+        [property: JsonPropertyName("paymentUrl")] string? PaymentUrl = null
     );
 }

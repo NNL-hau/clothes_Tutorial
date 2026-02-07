@@ -1,4 +1,5 @@
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+# Version: 1.0.1
 WORKDIR /app
 EXPOSE 80
 

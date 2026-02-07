@@ -3,6 +3,7 @@ using Payment.API.Data;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+Console.WriteLine("[PAYMENT_API_V2_BOOT] Application starting up...");
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -11,7 +12,7 @@ builder.Services.AddControllers();
 builder.Services.AddDbContext<PaymentDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+    options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 33)));
 });
 
 // Configure Swagger
@@ -40,11 +41,35 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    // Auto-migrate database on startup
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
+        
+        // Simple retry logic for DB connectivity in Docker
+        int retries = 5;
+        while (retries > 0)
+        {
+            try 
+            {
+                db.Database.EnsureCreated();
+                break;
+            }
+            catch (Exception ex)
+            {
+                retries--;
+                if (retries == 0) throw;
+                Console.WriteLine($"[Payment.API] Database not ready, retrying... ({5-retries}/5): {ex.Message}");
+                Thread.Sleep(5000);
+            }
+        }
+    }
 }
 
 app.UseCors("AllowBlazorWasm");
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 
 app.UseAuthorization();
 

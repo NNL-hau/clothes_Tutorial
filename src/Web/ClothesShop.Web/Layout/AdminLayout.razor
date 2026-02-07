@@ -173,21 +173,30 @@
             Notifications.Clear();
             
             // New orders (last 24h)
-            foreach (var o in orders.Where(o => o.CreatedAt > DateTime.Now.AddDays(-1)).OrderByDescending(o => o.CreatedAt).Take(3))
+            if (orders != null)
             {
-                Notifications.Add(new($"Đơn hàng mới #{o.Id.ToString().Substring(0,4)}", $"{o.UserName} - {o.TotalPrice:N0}₫", "order", "fa-solid fa-shopping-cart", true));
+                foreach (var o in orders.Where(o => o != null && o.CreatedAt > DateTime.Now.AddDays(-1)).OrderByDescending(o => o.CreatedAt).Take(3))
+                {
+                    Notifications.Add(new($"Đơn hàng mới #{o.Id.ToString().Substring(0, 4)}", $"{o.UserName} - {o.TotalPrice:N0}₫", "order", "fa-solid fa-shopping-cart", true));
+                }
             }
 
-            // Pending reviews
-            foreach (var r in reviews.Where(r => !r.IsApproved).OrderByDescending(r => r.CreatedAt).Take(2))
+            // Pending reviews (last 24h or unapproved)
+            if (reviews != null)
             {
-                Notifications.Add(new($"Bình luận chờ duyệt", $"{r.UserName}: {r.Comment}", "review", "fa-solid fa-comment", true));
+                foreach (var r in reviews.Where(r => r != null && !r.IsApproved).OrderByDescending(r => r.CreatedAt).Take(2))
+                {
+                    Notifications.Add(new($"Bình luận chờ duyệt", $"{r.UserName}: {r.Comment}", "review", "fa-solid fa-comment", true));
+                }
             }
 
-            // High stock warnings
-            foreach (var p in products.Where(p => p.StockQuantity > 0 && p.StockQuantity < 5).Take(2))
+            // High stock warnings (safe check)
+            if (products != null)
             {
-                Notifications.Add(new($"Sắp hết hàng: {p.Name}", $"Chỉ còn {p.StockQuantity} sản phẩm", "warn", "fa-solid fa-exclamation-triangle", true));
+                foreach (var p in products.Where(p => p != null && p.StockQuantity > 0 && p.StockQuantity < 5).Take(2))
+                {
+                    Notifications.Add(new($"Sắp hết hàng: {p.Name}", $"Chỉ còn {p.StockQuantity} sản phẩm", "warn", "fa-solid fa-exclamation-triangle", true));
+                }
             }
 
             StateHasChanged();

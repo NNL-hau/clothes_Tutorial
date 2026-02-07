@@ -1,0 +1,178 @@
+@page "/success/{OrderId}"
+@inject IOrderApiService OrderApiService
+@inject NavigationManager Navigation
+
+<div class="success-container animate__animated animate__fadeIn">
+    <div class="success-card shadow">
+        <div class="success-icon">
+            <i class="bi bi-check-circle-fill"></i>
+        </div>
+        <h1 class="success-title">Đặt hàng thành công!</h1>
+        <p class="success-msg">Cảm ơn bạn đã tin tưởng mua sắm. Đơn hàng của bạn đã được tiếp nhận và đang xử lý.</p>
+
+        @if (order == null)
+        {
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Đang tải hóa đơn...</span>
+            </div>
+        }
+        else
+        {
+            <div class="invoice-box mt-4">
+                <div class="invoice-header">
+                    <h5>MÃ ĐƠN HÀNG: #@order.Id.ToString().Substring(0, 8).ToUpper()</h5>
+                    <span class="invoice-date">Ngày đặt: @order.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                </div>
+                <hr />
+                <div class="invoice-body">
+                    <div class="customer-info mb-4">
+                        <div class="info-row"><strong>Người nhận:</strong> @order.FullName</div>
+                        <div class="info-row"><strong>Số điện thoại:</strong> @order.PhoneNumber</div>
+                        <div class="info-row"><strong>Địa chỉ:</strong> @order.AddressDetail, @order.Ward, @order.District, @order.Province</div>
+                        <div class="info-row"><strong>Phương thức:</strong> @order.PaymentMethodName</div>
+                    </div>
+
+                    <div class="order-items-table">
+                        <table class="table table-borderless">
+                            <thead>
+                                <tr>
+                                    <th>Sản phẩm</th>
+                                    <th class="text-center">SL</th>
+                                    <th class="text-end">Thành tiền</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in order.OrderItems)
+                                {
+                                    <tr>
+                                        <td>@item.ProductName</td>
+                                        <td class="text-center">@item.Quantity</td>
+                                        <td class="text-end">@((item.Price * item.Quantity).ToString("N0")) đ</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <hr />
+                    <div class="invoice-footer">
+                        <div class="total-price-row">
+                            <span>TỔNG CỘNG:</span>
+                            <span class="total-amount">@order.TotalPrice.ToString("N0") đ</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="action-buttons mt-4">
+                <button class="btn btn-primary btn-lg px-5" @onclick='() => Navigation.NavigateTo("/")'>
+                    TIẾP TỤC MUA SẮM
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .success-container {
+        max-width: 800px;
+        margin: 60px auto;
+        padding: 0 20px;
+    }
+
+    .success-card {
+        background: #fff;
+        border-radius: 20px;
+        padding: 40px;
+        text-align: center;
+        border: none;
+    }
+
+    .success-icon {
+        font-size: 80px;
+        color: #28a745;
+        margin-bottom: 20px;
+    }
+
+    .success-title {
+        font-weight: 700;
+        font-size: 32px;
+        color: #333;
+        margin-bottom: 10px;
+    }
+
+    .success-msg {
+        color: #666;
+        font-size: 16px;
+    }
+
+    .invoice-box {
+        text-align: left;
+        background: #fcfcfc;
+        border: 1px dashed #ddd;
+        border-radius: 12px;
+        padding: 30px;
+    }
+
+    .invoice-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .invoice-header h5 {
+        margin: 0;
+        font-weight: 700;
+        color: #333;
+    }
+
+    .invoice-date {
+        font-size: 13px;
+        color: #888;
+    }
+
+    .info-row {
+        margin-bottom: 5px;
+        font-size: 14px;
+        color: #444;
+    }
+
+    .total-price-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 700;
+        font-size: 18px;
+    }
+
+    .total-amount {
+        color: #d10000;
+        font-size: 24px;
+    }
+
+    .btn-primary {
+        background: #333;
+        border: none;
+        border-radius: 10px;
+        transition: all 0.3s;
+    }
+
+    .btn-primary:hover {
+        background: #000;
+        transform: translateY(-3px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+</style>
+
+@code {
+    [Parameter] public string OrderId { get; set; } = string.Empty;
+    private OrderDto? order;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Guid.TryParse(OrderId, out var id))
+        {
+            order = await OrderApiService.GetOrderAsync(id);
+        }
+    }
+}

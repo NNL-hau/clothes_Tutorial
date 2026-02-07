@@ -43,6 +43,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IProductApiService, ProductApiService>();
 builder.Services.AddScoped<IBannerApiService, BannerApiService>();
 builder.Services.AddScoped<IOrderApiService, OrderApiService>();
+builder.Services.AddScoped<IEmailService, MockEmailService>();
 builder.Services.AddScoped<IUserApiService, UserApiService>();
 builder.Services.AddScoped<ICategoryApiService, CategoryApiService>();
 builder.Services.AddScoped<IReviewApiService, ReviewApiService>();

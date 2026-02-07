@@ -42,9 +42,11 @@
                 </div>
                 <div class="filter-tabs">
                     <button class="tab-btn @(selectedStatus == "" ? "active" : "")" @onclick='() => selectedStatus = ""'>Tất cả</button>
+                    <button class="tab-btn @(selectedStatus == "AwaitingPayment" ? "active" : "")" @onclick='() => selectedStatus = "AwaitingPayment"'>Chờ thanh toán</button>
                     <button class="tab-btn @(selectedStatus == "Pending" ? "active" : "")" @onclick='() => selectedStatus = "Pending"'>Chờ xử lý</button>
-                    <button class="tab-btn @(selectedStatus == "InProgress" ? "active" : "")" @onclick='() => selectedStatus = "InProgress"'>Đang giao</button>
-                    <button class="tab-btn @(selectedStatus == "Shipped" ? "active" : "")" @onclick='() => selectedStatus = "Shipped"'>Hoàn thành</button>
+                    <button class="tab-btn @(selectedStatus == "InProgress" ? "active" : "")" @onclick='() => selectedStatus = "InProgress"'>Đang xử lý</button>
+                    <button class="tab-btn @(selectedStatus == "Shipped" ? "active" : "")" @onclick='() => selectedStatus = "Shipped"'>Đang giao</button>
+                    <button class="tab-btn @(selectedStatus == "Cancelled" ? "active" : "")" @onclick='() => selectedStatus = "Cancelled"'>Đã hủy</button>
                 </div>
             </div>
 
@@ -67,8 +69,8 @@
                                 <td><strong style="color: var(--primary-color);">#@o.Id.ToString().Substring(0, 8).ToUpper()</strong></td>
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
-                                        <div class="avatar-small">@o.UserName.Substring(0, 1)</div>
-                                        <div style="font-weight: 700; color: var(--text-main);">@o.UserName</div>
+                                        <div class="avatar-small">@(string.IsNullOrEmpty(o.UserName) ? "?" : o.UserName.Substring(0, 1))</div>
+                                        <div style="font-weight: 700; color: var(--text-main);">@(string.IsNullOrEmpty(o.UserName) ? "Khách vãng lai" : o.UserName)</div>
                                     </div>
                                 </td>
                                 <td>
@@ -171,6 +173,7 @@
                 <div class="form-group">
                     <label class="form-label-custom">Trạng thái mới</label>
                     <select class="form-control-custom" @bind="newStatus">
+                        <option value="AwaitingPayment">Chờ thanh toán</option>
                         <option value="Pending">Chờ xử lý</option>
                         <option value="InProgress">Đang xử lý</option>
                         <option value="Shipped">Đã giao hàng</option>
@@ -300,13 +303,16 @@
     {
         get
         {
-            var filtered = orders.AsEnumerable();
+            if (orders == null) return Enumerable.Empty<OrderDto>();
+            
+            var filtered = orders.Where(o => o != null);
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 filtered = filtered.Where(o => 
-                    o.Id.ToString().Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                    o.UserName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+                    (o.Id.ToString().Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+                    (o.UserName != null && o.UserName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+                    (o.FullName != null && o.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)));
             }
 
             if (!string.IsNullOrWhiteSpace(selectedStatus))
@@ -320,6 +326,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await base.OnInitializedAsync();
         await LoadOrders();
     }
 
@@ -329,20 +336,25 @@
         errorMessage = string.Empty;
         try
         {
+            Console.WriteLine("[AdminOrders] Starting to load orders...");
             orders = await OrderService.GetOrdersAsync();
+            Console.WriteLine($"[AdminOrders] Loaded {orders?.Count ?? 0} orders.");
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[AdminOrders] Error loading orders: {ex}");
             errorMessage = $"Lỗi tải danh sách đơn hàng: {ex.Message}";
         }
         finally
         {
             isLoading = false;
+            StateHasChanged();
         }
     }
 
     private string TranslateStatus(string status) => status switch
     {
+        "AwaitingPayment" => "Chờ thanh toán",
         "Pending" => "Chờ xử lý",
         "InProgress" => "Đang xử lý",
         "Shipped" => "Đã giao hàng",
@@ -353,18 +365,20 @@
     private string GetStatusBg(string status) => status switch
     {
         "Shipped" => "#ecfdf5",
+        "AwaitingPayment" => "#fef2f2",
         "Pending" => "#fffbeb",
         "InProgress" => "#eff6ff",
-        "Cancelled" => "#fff1f2",
+        "Cancelled" => "#f3f4f6",
         _ => "#f1f3f9"
     };
 
     private string GetStatusColor(string status) => status switch
     {
         "Shipped" => "#059669",
+        "AwaitingPayment" => "#ef4444",
         "Pending" => "#d97706",
         "InProgress" => "#2563eb",
-        "Cancelled" => "#e11d48",
+        "Cancelled" => "#9ca3af",
         _ => "#64748b"
     };
 
@@ -438,4 +452,6 @@
         var base64 = Convert.ToBase64String(bytes);
         await JS.InvokeVoidAsync("downloadFile", "orders_report.csv", "text/csv", base64);
     }
+
+    protected override bool RequireAdminRole => true;
 }

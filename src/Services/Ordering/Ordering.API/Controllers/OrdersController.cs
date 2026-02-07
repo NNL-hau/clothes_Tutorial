@@ -11,10 +11,12 @@ namespace Ordering.API.Controllers
     public class OrdersController : ControllerBase
     {
         private readonly OrderingDbContext _context;
+        private readonly ILogger<OrdersController> _logger;
 
-        public OrdersController(OrderingDbContext context)
+        public OrdersController(OrderingDbContext context, ILogger<OrdersController> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         [HttpGet]
@@ -27,9 +29,73 @@ namespace Ordering.API.Controllers
                     o.UserName, 
                     o.TotalPrice, 
                     o.OrderStatus, 
-                    o.CreatedAt, 
+                    o.CreatedAt,
+                    o.FullName,
+                    o.PhoneNumber,
+                    o.Province,
+                    o.District,
+                    o.Ward,
+                    o.AddressDetail,
+                    o.PaymentMethodName,
                     o.OrderItems.Select(oi => new OrderItemDto(oi.Id, oi.ProductId, oi.ProductName, oi.Price, oi.Quantity)).ToList()))
                 .ToListAsync();
+        }
+
+        [HttpPost]
+        public async Task<ActionResult<OrderDto>> CreateOrder([FromBody] CreateOrderDto dto)
+        {
+            _logger.LogInformation("Creating order for User: {UserName}, FullName: {FullName}", dto.UserName, dto.FullName);
+            
+            var order = new Order
+            {
+                UserName = dto.UserName,
+                TotalPrice = dto.TotalPrice,
+                FullName = dto.FullName,
+                PhoneNumber = dto.PhoneNumber,
+                EmailAddress = dto.EmailAddress,
+                Province = dto.Province,
+                District = dto.District,
+                Ward = dto.Ward,
+                AddressDetail = dto.AddressDetail,
+                AddressLine = dto.AddressLine,
+                Country = dto.Country,
+                State = dto.State,
+                ZipCode = dto.ZipCode,
+                CardName = dto.CardName,
+                CardNumber = dto.CardNumber,
+                Expiration = dto.Expiration,
+                CVV = dto.CVV,
+                PaymentMethodName = dto.PaymentMethodName,
+                PaymentMethod = dto.PaymentMethod,
+                OrderStatus = "AwaitingPayment",
+                OrderItems = dto.OrderItems.Select(oi => new OrderItem
+                {
+                    ProductId = oi.ProductId,
+                    ProductName = oi.ProductName,
+                    Price = oi.Price,
+                    Quantity = oi.Quantity
+                }).ToList()
+            };
+
+            _context.Orders.Add(order);
+            await _context.SaveChangesAsync();
+
+            var result = new OrderDto(
+                order.Id,
+                order.UserName,
+                order.TotalPrice,
+                order.OrderStatus,
+                order.CreatedAt,
+                order.FullName,
+                order.PhoneNumber,
+                order.Province,
+                order.District,
+                order.Ward,
+                order.AddressDetail,
+                order.PaymentMethodName,
+                order.OrderItems.Select(oi => new OrderItemDto(oi.Id, oi.ProductId, oi.ProductName, oi.Price, oi.Quantity)).ToList());
+
+            return CreatedAtAction(nameof(GetOrder), new { id = order.Id }, result);
         }
 
         [HttpGet("{id}")]
@@ -46,7 +112,14 @@ namespace Ordering.API.Controllers
                 o.UserName, 
                 o.TotalPrice, 
                 o.OrderStatus, 
-                o.CreatedAt, 
+                o.CreatedAt,
+                o.FullName,
+                o.PhoneNumber,
+                o.Province,
+                o.District,
+                o.Ward,
+                o.AddressDetail,
+                o.PaymentMethodName,
                 o.OrderItems.Select(oi => new OrderItemDto(oi.Id, oi.ProductId, oi.ProductName, oi.Price, oi.Quantity)).ToList());
         }
 

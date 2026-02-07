@@ -31,6 +31,6 @@ namespace ClothesShop.Web.Pages
         }
 
         // Override this in derived classes if admin role is required
-        protected virtual bool RequireAdminRole => true;
+        protected virtual bool RequireAdminRole => false;
     }
 }

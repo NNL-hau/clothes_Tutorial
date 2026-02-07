@@ -12,6 +12,20 @@
     </div>
 </div>
 
+@inject NavigationManager Navigation
+@inject IAuthService AuthService
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var role = await AuthService.GetUserRoleAsync();
+        if (role == "Admin")
+        {
+            Navigation.NavigateTo("/admin");
+        }
+    }
+}
+
 <style>
     .home-page {
         background: #fff;
