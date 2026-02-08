@@ -233,44 +233,39 @@ namespace Payment.API.Controllers
             var vnp_TmnCode = _configuration["Payment:VNPay:TmnCode"];
             var vnp_HashSecret = _configuration["Payment:VNPay:HashSecret"];
             var vnp_Url = _configuration["Payment:VNPay:PaymentUrl"];
-            
             var vnp_ReturnUrl = _configuration["Payment:VNPay:ReturnUrl"];
 
-            vnpay.AddRequestData("vnp_Version", _configuration["Payment:VNPay:Version"] ?? "2.1.0");
-            vnpay.AddRequestData("vnp_Command", _configuration["Payment:VNPay:Command"] ?? "pay");
+            vnpay.AddRequestData("vnp_Version", "2.1.0");
+            vnpay.AddRequestData("vnp_Command", "pay");
             vnpay.AddRequestData("vnp_TmnCode", vnp_TmnCode!);
+
+            // Amount x 100
             vnpay.AddRequestData("vnp_Amount", ((long)(transaction.Amount * 100)).ToString());
+
+            // Create date: yyyyMMddHHmmss
             vnpay.AddRequestData("vnp_CreateDate", transaction.CreatedAt.ToString("yyyyMMddHHmmss"));
-            vnpay.AddRequestData("vnp_CurrCode", _configuration["Payment:VNPay:CurrCode"] ?? "VND");
-            
+
+            vnpay.AddRequestData("vnp_CurrCode", "VND");
+
             string ipAddr = GetClientIpAddress();
             if (ipAddr == "::1") ipAddr = "127.0.0.1";
             vnpay.AddRequestData("vnp_IpAddr", ipAddr);
-            
-            vnpay.AddRequestData("vnp_Locale", _configuration["Payment:VNPay:Locale"] ?? "vn");
-            
-            // "vnp_OrderInfo": Content of payment
-            // "vnp_TxnRef": Merchant's transaction reference code
-            // VNPay Rule: No special characters.
-            
-            // Format OrderId to string for info
-            string orderIdStr = transaction.OrderId.ToString().Substring(0, 8); // Shorten for readability
-            string orderInfo = $"Thanh toan don hang {orderIdStr}";
-            
+
+            vnpay.AddRequestData("vnp_Locale", "vn");
+
+            //  QUAN TRỌNG: KHÔNG DÙNG TIẾNG VIỆT CÓ DẤU
+            string orderIdShort = transaction.OrderId.ToString().Substring(0, 8);
+            string orderInfo = $"Pay for order {orderIdShort}"; //  Chỉ dùng ASCII
             vnpay.AddRequestData("vnp_OrderInfo", orderInfo);
-            vnpay.AddRequestData("vnp_OrderType", "other"); // Required by some sandbox envs
-            
-            vnpay.AddRequestData("vnp_ExpireDate", transaction.CreatedAt.AddMinutes(15).ToString("yyyyMMddHHmmss"));
 
+            vnpay.AddRequestData("vnp_OrderType", "other");
             vnpay.AddRequestData("vnp_ReturnUrl", vnp_ReturnUrl!);
-            
-            // Use Guid "N" format (32 digits, no hyphens) to be safe
-            // NOTE: Callback must be able to parse this back to Guid.
-            // Guid.Parse("32digits") works fine.
-            vnpay.AddRequestData("vnp_TxnRef", transaction.Id.ToString("N")); 
 
-            _logger.LogInformation("VNPay Request Parameters: TmnCode={TmnCode}, Amount={Amount}, TxnRef={TxnRef}, ReturnUrl={ReturnUrl}, IpAddr={IpAddr}", 
-                vnp_TmnCode, transaction.Amount * 100, transaction.Id, vnp_ReturnUrl, ipAddr);
+            // TxnRef: dùng format N (32 ký tự không dấu gạch ngang)
+            vnpay.AddRequestData("vnp_TxnRef", transaction.Id.ToString("N"));
+
+            _logger.LogInformation("VNPay Parameters: TmnCode={TmnCode}, Amount={Amount}, TxnRef={TxnRef}",
+                vnp_TmnCode, transaction.Amount * 100, transaction.Id.ToString("N"));
 
             return vnpay.CreateRequestUrl(vnp_Url!, vnp_HashSecret!);
         }

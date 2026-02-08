@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -33,38 +33,30 @@ namespace Payment.API.Utils
 
         public string CreateRequestUrl(string baseUrl, string vnpHashSecret)
         {
-            StringBuilder data = new StringBuilder();
-            StringBuilder query = new StringBuilder();
-            
+            StringBuilder hashData = new StringBuilder();
+            StringBuilder queryString = new StringBuilder();
+
             foreach (KeyValuePair<string, string> kv in _requestData)
             {
                 if (!string.IsNullOrEmpty(kv.Value))
                 {
-                    // Build Hash Data: Use Raw Value (NO URL ENCODE)
-                    data.Append(kv.Key + "=" + kv.Value + "&");
+                    // Hash Data: key=value (NO encoding)
+                    hashData.Append(kv.Key + "=" + kv.Value + "&");
 
-                    // Build Query String: Use Url Encoded Value
-                    query.Append(WebUtility.UrlEncode(kv.Key) + "=" + WebUtility.UrlEncode(kv.Value) + "&");
+                    // Query String: key=value (WITH URL encoding)
+                    queryString.Append(WebUtility.UrlEncode(kv.Key) + "=" + WebUtility.UrlEncode(kv.Value) + "&");
                 }
             }
 
-            string queryString = query.ToString();
-            string rawHashString = data.ToString();
-
             // Remove last '&'
-            if (queryString.Length > 0)
-            {
-                queryString = queryString.Remove(queryString.Length - 1, 1);
-            }
-            if (rawHashString.Length > 0)
-            {
-                rawHashString = rawHashString.Remove(rawHashString.Length - 1, 1);
-            }
+            string rawHash = hashData.ToString().TrimEnd('&');
+            string query = queryString.ToString().TrimEnd('&');
 
-            string vnpSecureHash = HmacSHA512(vnpHashSecret, rawHashString);
-            string paymentUrl = baseUrl + "?" + queryString + "&vnp_SecureHash=" + vnpSecureHash;
+            // Calculate HMAC SHA512
+            string vnpSecureHash = HmacSHA512(vnpHashSecret, rawHash);
 
-            return paymentUrl;
+            // Final URL
+            return $"{baseUrl}?{query}&vnp_SecureHash={vnpSecureHash}";
         }
 
         public bool ValidateSignature(string inputHash, string secretKey)
@@ -77,6 +69,8 @@ namespace Payment.API.Utils
         private string GetResponseRaw()
         {
             StringBuilder data = new StringBuilder();
+
+            // Remove vnp_SecureHash and vnp_SecureHashType before hashing
             if (_responseData.ContainsKey("vnp_SecureHashType"))
             {
                 _responseData.Remove("vnp_SecureHashType");
@@ -90,17 +84,13 @@ namespace Payment.API.Utils
             {
                 if (!string.IsNullOrEmpty(kv.Value))
                 {
-                    // Response: Raw Param logic
+                    // ⚠️ KHÔNG URL ENCODE khi tính hash
                     data.Append(kv.Key + "=" + kv.Value + "&");
                 }
             }
 
-            if (data.Length > 0)
-            {
-                data.Remove(data.Length - 1, 1);
-            }
-
-            return data.ToString();
+            // Remove trailing '&'
+            return data.ToString().TrimEnd('&');
         }
 
         public static string HmacSHA512(string key, string inputData)
