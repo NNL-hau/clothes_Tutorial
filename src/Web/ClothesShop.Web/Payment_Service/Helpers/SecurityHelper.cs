@@ -5,6 +5,19 @@ namespace Payment_Service.Helpers
 {
     public static class SecurityHelper
     {
+        public static string HmacSHA512(string message, string secret)
+        {
+            var encoding = new UTF8Encoding();
+            byte[] keyByte = encoding.GetBytes(secret);
+            byte[] messageBytes = encoding.GetBytes(message);
+
+            using (var hmacsha512 = new HMACSHA512(keyByte))
+            {
+                byte[] hashmessage = hmacsha512.ComputeHash(messageBytes);
+                return BitConverter.ToString(hashmessage).Replace("-", "").ToLower();
+            }
+        }
+
         public static string HmacSHA256(string message, string secret)
         {
             var encoding = new UTF8Encoding();

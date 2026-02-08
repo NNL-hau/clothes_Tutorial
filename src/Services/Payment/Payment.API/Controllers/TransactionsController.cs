@@ -54,10 +54,14 @@ namespace Payment.API.Controllers
 
             bool isValidSignature = vnpay.ValidateSignature(vnp_SecureHash, vnp_HashSecret);
 
-            if (!isValidSignature)
+            if (isValidSignature)
+            {
+                // We update status in Callback too as a fallback for IPN
+                await UpdateTransactionStatus(txnRef, responseCode, vnpay.GetResponseData("vnp_TransactionStatus"));
+            }
+            else
             {
                 _logger.LogWarning("VNPay Callback: Invalid Signature for TxnRef: {TxnRef}", txnRef);
-                return BadRequest("Invalid signature");
             }
 
             // Redirect back to client with status
@@ -83,7 +87,6 @@ namespace Payment.API.Controllers
 
             string txnRef = vnpay.GetResponseData("vnp_TxnRef");
             string responseCode = vnpay.GetResponseData("vnp_ResponseCode");
-            string vnp_TransactionStatus = vnpay.GetResponseData("vnp_TransactionStatus");
             string vnp_SecureHash = Request.Query["vnp_SecureHash"]!;
             string vnp_HashSecret = _configuration["VnPay:HashSecret"]!;
 
@@ -94,34 +97,50 @@ namespace Payment.API.Controllers
                 return Ok(new { RspCode = "97", Message = "Invalid signature" });
             }
 
+            var result = await UpdateTransactionStatus(txnRef, responseCode, vnpay.GetResponseData("vnp_TransactionStatus"), vnpay.GetResponseData("vnp_Amount"));
+            
+            if (result == "Success") return Ok(new { RspCode = "00", Message = "Confirm Success" });
+            if (result == "AlreadyConfirmed") return Ok(new { RspCode = "02", Message = "Order already confirmed" });
+            if (result == "InvalidAmount") return Ok(new { RspCode = "04", Message = "Invalid amount" });
+            
+            return Ok(new { RspCode = "01", Message = "Order not found" });
+        }
+
+        private async Task<string> UpdateTransactionStatus(string txnRef, string responseCode, string transactionStatus, string? vnpAmountStr = null)
+        {
             if (!Guid.TryParse(txnRef, out var transactionId))
             {
-                return Ok(new { RspCode = "01", Message = "Order not found" });
+                return "NotFound";
             }
 
             var transaction = await _context.Transactions.FindAsync(transactionId);
             if (transaction == null)
             {
-                return Ok(new { RspCode = "01", Message = "Order not found" });
+                return "NotFound";
             }
 
-            // Check if transaction already confirmed
+            // Check if transaction already confirmed (Success or Failed)
             if (transaction.Status != "Pending")
             {
-                return Ok(new { RspCode = "02", Message = "Order already confirmed" });
+                return "AlreadyConfirmed";
             }
 
-            // Validate Amount (vnp_Amount is multiplied by 100)
-            long vnp_Amount = Convert.ToInt64(vnpay.GetResponseData("vnp_Amount")) / 100;
-            if (transaction.Amount != vnp_Amount)
+            // Validate Amount if provided (vnp_Amount is multiplied by 100)
+            if (!string.IsNullOrEmpty(vnpAmountStr))
             {
-                return Ok(new { RspCode = "04", Message = "Invalid amount" });
+                long vnp_Amount = Convert.ToInt64(vnpAmountStr) / 100;
+                if (transaction.Amount != vnp_Amount)
+                {
+                    return "InvalidAmount";
+                }
             }
 
-            if (responseCode == "00" && vnp_TransactionStatus == "00")
+            // VNPay 2.1.0: responseCode 00 means successful communication, transactionStatus 00 means successful payment
+            // However, transactionStatus might be missing in some ReturnUrl data, so we check responseCode primarily
+            if (responseCode == "00" && (string.IsNullOrEmpty(transactionStatus) || transactionStatus == "00"))
             {
                 transaction.Status = "Success";
-                _logger.LogInformation("IPN: Transaction {TxnRef} successful. Updating Order {OrderId} to Pending.", txnRef, transaction.OrderId);
+                _logger.LogInformation("Transaction {TxnRef} successful. Updating Order {OrderId} to Pending.", txnRef, transaction.OrderId);
                 
                 try 
                 {
@@ -132,22 +151,23 @@ namespace Payment.API.Controllers
                     
                     if (!response.IsSuccessStatusCode)
                     {
-                        _logger.LogError("IPN: Failed to update Order {OrderId} status: {Status}", transaction.OrderId, response.StatusCode);
+                        var error = await response.Content.ReadAsStringAsync();
+                        _logger.LogError("Failed to update Order {OrderId} status: {Status}, Error: {Error}", transaction.OrderId, response.StatusCode, error);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "IPN: Error calling Ordering API for Order {OrderId}", transaction.OrderId);
+                    _logger.LogError(ex, "Error calling Ordering API for Order {OrderId}", transaction.OrderId);
                 }
             }
             else
             {
                 transaction.Status = "Failed";
-                _logger.LogWarning("IPN: Transaction {TxnRef} failed with code {Code}", txnRef, responseCode);
+                _logger.LogWarning("Transaction {TxnRef} failed with code {Code}", txnRef, responseCode);
             }
 
             await _context.SaveChangesAsync();
-            return Ok(new { RspCode = "00", Message = "Confirm Success" });
+            return "Success";
         }
 
         /// <summary>
@@ -210,54 +230,47 @@ namespace Payment.API.Controllers
         private string GenerateVnPayUrl(Transaction transaction, CreateTransactionDto dto)
         {
             var vnpay = new Utils.VnPayLibrary();
-            var vnp_TmnCode = _configuration["VnPay:TmnCode"];
-            var vnp_HashSecret = _configuration["VnPay:HashSecret"];
-            var vnp_Url = _configuration["VnPay:BaseUrl"];
+            var vnp_TmnCode = _configuration["Payment:VNPay:TmnCode"];
+            var vnp_HashSecret = _configuration["Payment:VNPay:HashSecret"];
+            var vnp_Url = _configuration["Payment:VNPay:PaymentUrl"];
             
-            var vnp_CallbackUrl = _configuration["VnPay:CallbackUrl"];
+            var vnp_ReturnUrl = _configuration["Payment:VNPay:ReturnUrl"];
 
-            vnpay.AddRequestData("vnp_Version", _configuration["VnPay:Version"] ?? "2.1.0");
-            vnpay.AddRequestData("vnp_Command", _configuration["VnPay:Command"] ?? "pay");
+            vnpay.AddRequestData("vnp_Version", _configuration["Payment:VNPay:Version"] ?? "2.1.0");
+            vnpay.AddRequestData("vnp_Command", _configuration["Payment:VNPay:Command"] ?? "pay");
             vnpay.AddRequestData("vnp_TmnCode", vnp_TmnCode!);
             vnpay.AddRequestData("vnp_Amount", ((long)(transaction.Amount * 100)).ToString());
             vnpay.AddRequestData("vnp_CreateDate", transaction.CreatedAt.ToString("yyyyMMddHHmmss"));
-            vnpay.AddRequestData("vnp_CurrCode", _configuration["VnPay:CurrCode"] ?? "VND");
+            vnpay.AddRequestData("vnp_CurrCode", _configuration["Payment:VNPay:CurrCode"] ?? "VND");
             
             string ipAddr = GetClientIpAddress();
+            if (ipAddr == "::1") ipAddr = "127.0.0.1";
             vnpay.AddRequestData("vnp_IpAddr", ipAddr);
             
-            vnpay.AddRequestData("vnp_Locale", _configuration["VnPay:Locale"] ?? "vn");
+            vnpay.AddRequestData("vnp_Locale", _configuration["Payment:VNPay:Locale"] ?? "vn");
             
-            string orderInfo = $"Payment_Order_{transaction.OrderId.ToString().Substring(0, 8)}";
+            // "vnp_OrderInfo": Content of payment
+            // "vnp_TxnRef": Merchant's transaction reference code
+            // VNPay Rule: No special characters.
+            
+            // Format OrderId to string for info
+            string orderIdStr = transaction.OrderId.ToString().Substring(0, 8); // Shorten for readability
+            string orderInfo = $"Thanh toan don hang {orderIdStr}";
+            
             vnpay.AddRequestData("vnp_OrderInfo", orderInfo);
-            vnpay.AddRequestData("vnp_OrderType", "other");
+            vnpay.AddRequestData("vnp_OrderType", "other"); // Required by some sandbox envs
             
             vnpay.AddRequestData("vnp_ExpireDate", transaction.CreatedAt.AddMinutes(15).ToString("yyyyMMddHHmmss"));
 
-            // Commented out billing info for baseline testing - simple request is more likely to succeed
-            /*
-            if (!string.IsNullOrEmpty(dto.FullName))
-            {
-                vnpay.AddRequestData("vnp_Bill_Mobile", dto.PhoneNumber ?? "");
-                vnpay.AddRequestData("vnp_Bill_Email", dto.Email ?? "");
-                var names = dto.FullName.Trim().Split(' ');
-                if (names.Length > 1)
-                {
-                    vnpay.AddRequestData("vnp_Bill_FirstName", names.Last());
-                    vnpay.AddRequestData("vnp_Bill_LastName", string.Join(" ", names.Take(names.Length - 1)));
-                }
-                else
-                {
-                    vnpay.AddRequestData("vnp_Bill_FirstName", dto.FullName);
-                }
-            }
-            */
-
-            vnpay.AddRequestData("vnp_ReturnUrl", vnp_CallbackUrl!);
-            vnpay.AddRequestData("vnp_TxnRef", transaction.Id.ToString());
+            vnpay.AddRequestData("vnp_ReturnUrl", vnp_ReturnUrl!);
+            
+            // Use Guid "N" format (32 digits, no hyphens) to be safe
+            // NOTE: Callback must be able to parse this back to Guid.
+            // Guid.Parse("32digits") works fine.
+            vnpay.AddRequestData("vnp_TxnRef", transaction.Id.ToString("N")); 
 
             _logger.LogInformation("VNPay Request Parameters: TmnCode={TmnCode}, Amount={Amount}, TxnRef={TxnRef}, ReturnUrl={ReturnUrl}, IpAddr={IpAddr}", 
-                vnp_TmnCode, transaction.Amount * 100, transaction.Id, vnp_CallbackUrl, ipAddr);
+                vnp_TmnCode, transaction.Amount * 100, transaction.Id, vnp_ReturnUrl, ipAddr);
 
             return vnpay.CreateRequestUrl(vnp_Url!, vnp_HashSecret!);
         }

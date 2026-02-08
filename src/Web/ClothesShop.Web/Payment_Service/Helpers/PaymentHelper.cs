@@ -5,20 +5,49 @@ namespace Payment_Service.Helpers
 {
     public static class PaymentHelper
     {
+        /// <summary>
+        /// Build query string cho VNPay - QUAN TRỌNG: Phải sort theo thứ tự alphabet
+        /// </summary>
         public static string BuildQueryString(Dictionary<string, string> parameters)
         {
-            var sortedParams = parameters.OrderBy(x => x.Key);
+            // Sort parameters theo key (alphabet order)
+            var sortedParams = parameters
+                .Where(x => !string.IsNullOrEmpty(x.Value))
+                .OrderBy(x => x.Key)
+                .ToList();
+
             var queryString = new StringBuilder();
 
             foreach (var param in sortedParams)
             {
-                if (!string.IsNullOrEmpty(param.Value))
-                {
-                    if (queryString.Length > 0)
-                        queryString.Append("&");
+                if (queryString.Length > 0)
+                    queryString.Append("&");
 
-                    queryString.Append($"{HttpUtility.UrlEncode(param.Key)}={HttpUtility.UrlEncode(param.Value)}");
-                }
+                // KHÔNG URL ENCODE cho hash data
+                queryString.Append($"{param.Key}={param.Value}");
+            }
+
+            return queryString.ToString();
+        }
+
+        /// <summary>
+        /// Build query string có URL encode cho URL cuối cùng
+        /// </summary>
+        public static string BuildQueryStringWithUrlEncode(Dictionary<string, string> parameters)
+        {
+            var sortedParams = parameters
+                .Where(x => !string.IsNullOrEmpty(x.Value))
+                .OrderBy(x => x.Key)
+                .ToList();
+
+            var queryString = new StringBuilder();
+
+            foreach (var param in sortedParams)
+            {
+                if (queryString.Length > 0)
+                    queryString.Append("&");
+
+                queryString.Append($"{param.Key}={HttpUtility.UrlEncode(param.Value)}");
             }
 
             return queryString.ToString();
@@ -65,6 +94,16 @@ namespace Payment_Service.Helpers
                 "79" => "Giao dịch không thành công do: KH nhập sai mật khẩu thanh toán quá số lần quy định.",
                 _ => "Giao dịch thất bại"
             };
+        }
+
+        public static string GetIpAddress(Microsoft.AspNetCore.Http.HttpContext context)
+        {
+            var ipAddress = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+            if (string.IsNullOrEmpty(ipAddress))
+            {
+                ipAddress = context.Connection.RemoteIpAddress?.ToString();
+            }
+            return ipAddress ?? "127.0.0.1";
         }
     }
 }

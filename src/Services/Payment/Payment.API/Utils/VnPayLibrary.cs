@@ -34,66 +34,67 @@ namespace Payment.API.Utils
         public string CreateRequestUrl(string baseUrl, string vnpHashSecret)
         {
             StringBuilder data = new StringBuilder();
+            StringBuilder query = new StringBuilder();
             
             foreach (KeyValuePair<string, string> kv in _requestData)
             {
                 if (!string.IsNullOrEmpty(kv.Value))
                 {
-                    // VNPay 2.1.0 requires hashing the ENCODED query string
-                    // Symbols must be uppercase hex (e.g. %20, %3A)
-                    string key = UrlEncodeUppercase(kv.Key);
-                    string value = UrlEncodeUppercase(kv.Value);
-                    data.Append(key + "=" + value + "&");
+                    // Build Hash Data: Use Raw Value (NO URL ENCODE)
+                    data.Append(kv.Key + "=" + kv.Value + "&");
+
+                    // Build Query String: Use Url Encoded Value
+                    query.Append(WebUtility.UrlEncode(kv.Key) + "=" + WebUtility.UrlEncode(kv.Value) + "&");
                 }
             }
 
-            string queryString = data.ToString();
-            if (queryString.EndsWith("&"))
+            string queryString = query.ToString();
+            string rawHashString = data.ToString();
+
+            // Remove last '&'
+            if (queryString.Length > 0)
             {
                 queryString = queryString.Remove(queryString.Length - 1, 1);
             }
+            if (rawHashString.Length > 0)
+            {
+                rawHashString = rawHashString.Remove(rawHashString.Length - 1, 1);
+            }
 
-            // Calculate hash based on the encoded query string
-            string vnpSecureHash = HmacSha512(vnpHashSecret, queryString);
+            string vnpSecureHash = HmacSHA512(vnpHashSecret, rawHashString);
             string paymentUrl = baseUrl + "?" + queryString + "&vnp_SecureHash=" + vnpSecureHash;
 
             return paymentUrl;
         }
 
-        private string UrlEncodeUppercase(string value)
-        {
-            if (string.IsNullOrEmpty(value)) return string.Empty;
-            
-            // WebUtility.UrlEncode uses lowercase hex and '+' for spaces
-            string encoded = WebUtility.UrlEncode(value).Replace("+", "%20");
-            
-            // Force hex escapes to uppercase using Regex or manual replacement
-            System.Text.RegularExpressions.Regex reg = new System.Text.RegularExpressions.Regex(@"%[a-f0-9]{2}");
-            return reg.Replace(encoded, m => m.Value.ToUpperInvariant());
-        }
-
         public bool ValidateSignature(string inputHash, string secretKey)
         {
             string rspRaw = GetResponseRaw();
-            string myChecksum = HmacSha512(secretKey, rspRaw);
+            string myChecksum = HmacSHA512(secretKey, rspRaw);
             return myChecksum.Equals(inputHash, StringComparison.InvariantCultureIgnoreCase);
         }
 
         private string GetResponseRaw()
         {
             StringBuilder data = new StringBuilder();
-            
-            // Collect all response data EXCEPT vnp_SecureHash and vnp_SecureHashType
+            if (_responseData.ContainsKey("vnp_SecureHashType"))
+            {
+                _responseData.Remove("vnp_SecureHashType");
+            }
+            if (_responseData.ContainsKey("vnp_SecureHash"))
+            {
+                _responseData.Remove("vnp_SecureHash");
+            }
+
             foreach (KeyValuePair<string, string> kv in _responseData)
             {
-                if (!string.IsNullOrEmpty(kv.Value) && kv.Key != "vnp_SecureHash" && kv.Key != "vnp_SecureHashType")
+                if (!string.IsNullOrEmpty(kv.Value))
                 {
-                    // Response hashing also typically follows the same pattern
-                    data.Append(UrlEncodeUppercase(kv.Key) + "=" + UrlEncodeUppercase(kv.Value) + "&");
+                    // Response: Raw Param logic
+                    data.Append(kv.Key + "=" + kv.Value + "&");
                 }
             }
 
-            // Remove last '&'
             if (data.Length > 0)
             {
                 data.Remove(data.Length - 1, 1);
@@ -102,7 +103,7 @@ namespace Payment.API.Utils
             return data.ToString();
         }
 
-        public static string HmacSha512(string key, string inputData)
+        public static string HmacSHA512(string key, string inputData)
         {
             var hash = new StringBuilder();
             byte[] keyBytes = Encoding.UTF8.GetBytes(key);
@@ -116,11 +117,11 @@ namespace Payment.API.Utils
                 }
             }
 
-            return hash.ToString().ToUpper();
+            return hash.ToString();
         }
     }
 
-    public class VnPayCompare : IComparer<string?>
+    public class VnPayCompare : IComparer<string>
     {
         public int Compare(string? x, string? y)
         {

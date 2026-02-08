@@ -1,0 +1,140 @@
+@page "/checkout/result"
+@inject NavigationManager Navigation
+
+<div class="payment-result-container">
+    @if (isSuccess)
+    {
+        <div class="result-card success">
+            <div class="icon-wrapper">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <h2>Thanh toán thành công!</h2>
+            <p>Mã đơn hàng: <strong>@orderId</strong></p>
+            <p>Cảm ơn bạn đã mua hàng tại ClothesShop</p>
+            <div class="actions">
+                <button class="btn-primary" @onclick="GoToOrders">
+                    Xem đơn hàng
+                </button>
+                <button class="btn-secondary" @onclick="GoToHome">
+                    Về trang chủ
+                </button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="result-card failure">
+            <div class="icon-wrapper">
+                <i class="fa-solid fa-circle-xmark"></i>
+            </div>
+            <h2>Thanh toán thất bại</h2>
+            <p class="error-message">@message</p>
+            <div class="actions">
+                <button class="btn-primary" @onclick="GoToCheckout">
+                    Thử lại
+                </button>
+                <button class="btn-secondary" @onclick="GoToHome">
+                    Về trang chủ
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .payment-result-container {
+        min-height: 80vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        background: #f5f5f5;
+    }
+
+    .result-card {
+        background: white;
+        padding: 3rem;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        text-align: center;
+        max-width: 500px;
+        width: 100%;
+    }
+
+    .icon-wrapper {
+        font-size: 80px;
+        margin-bottom: 1.5rem;
+    }
+
+    .result-card.success .icon-wrapper {
+        color: #10b981;
+    }
+
+    .result-card.failure .icon-wrapper {
+        color: #ef4444;
+    }
+
+    .result-card h2 {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 1rem;
+    }
+
+    .result-card p {
+        font-size: 16px;
+        color: #666;
+        margin-bottom: 0.5rem;
+    }
+
+    .error-message {
+        color: #ef4444;
+        font-weight: 500;
+    }
+
+    .actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+        justify-content: center;
+    }
+
+    .btn-primary, .btn-secondary {
+        padding: 12px 30px;
+        border-radius: 8px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .btn-primary {
+        background: #2F4858;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #1e2f3a;
+    }
+
+    .btn-secondary {
+        background: white;
+        color: #2F4858;
+        border: 2px solid #2F4858;
+    }
+
+    .btn-secondary:hover {
+        background: #f5f5f5;
+    }
+</style>
+
+@code {
+    [SupplyParameterFromQuery] public bool success { get; set; }
+    [SupplyParameterFromQuery] public string? orderId { get; set; }
+    [SupplyParameterFromQuery] public string? message { get; set; }
+
+    private bool isSuccess => success;
+
+    private void GoToOrders() => Navigation.NavigateTo("/admin/orders");
+    private void GoToHome() => Navigation.NavigateTo("/");
+    private void GoToCheckout() => Navigation.NavigateTo("/checkout");
+}
