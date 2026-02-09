@@ -111,5 +111,27 @@ namespace ClothesShop.Web.Services
                 return false;
             }
         }
+
+        public async Task<bool> UpdateTransactionStatusAsync(Guid transactionId, string status)
+        {
+            try
+            {
+                var response = await _httpClient.PatchAsJsonAsync($"api/transactions/{transactionId}/status", new { Status = status });
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger?.LogError("Failed to update transaction {TransactionId} status to {Status}", transactionId, status);
+                    return false;
+                }
+
+                _logger?.LogInformation("Transaction {TransactionId} status updated to {Status}", transactionId, status);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error updating transaction {TransactionId} status", transactionId);
+                return false;
+            }
+        }
     }
 }

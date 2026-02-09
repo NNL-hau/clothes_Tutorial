@@ -1,6 +1,7 @@
+using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Payment.API.Data;
-using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 Console.WriteLine("[PAYMENT_API_V2_BOOT] Application starting up...");
@@ -13,6 +14,14 @@ builder.Services.AddDbContext<PaymentDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
     options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 33)));
+});
+
+// Configure Forwarded Headers for Docker/Nginx
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
 });
 
 // Configure Swagger
@@ -70,6 +79,8 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowBlazorWasm");
 
 // app.UseHttpsRedirection();
+
+app.UseForwardedHeaders();
 
 app.UseAuthorization();
 

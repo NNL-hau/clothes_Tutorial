@@ -476,29 +476,43 @@
             {
                 if (query.TryGetValue("vnp_TxnRef", out var txnRefStr) && Guid.TryParse(txnRefStr, out var txnId))
                 {
-                    // Fetch transaction to get OrderId
-                    var transaction = await PaymentApiService.GetTransactionsAsync();
-                    var currentTxn = transaction.FirstOrDefault(t => t.Id == txnId);
+                    // DEMO MODE: Update transaction status without verification
+                    var statusUpdated = await PaymentApiService.UpdateTransactionStatusAsync(txnId, "Success");
                     
-                    if (currentTxn != null)
+                    if (statusUpdated)
                     {
-                        successMessage = "Thanh toán VNPay thành công!";
+                        // Fetch transaction to get OrderId
+                        var transaction = await PaymentApiService.GetTransactionAsync(txnId);
                         
-                        // Xóa giỏ hàng và gửi email khi quay về từ VNPay thành công
-                        await BasketService.ClearBasketAsync();
-                        await EmailService.SendOrderConfirmationEmailAsync(checkoutForm.Email, checkoutForm.FullName, currentTxn.OrderId.ToString(), currentTxn.Amount);
-                        
-                        await Task.Delay(2000);
-                        Navigation.NavigateTo($"/success/{currentTxn.OrderId}");
+                        if (transaction != null)
+                        {
+                            successMessage = "Thanh toán VNPay thành công!";
+                            
+                            // Xóa giỏ hàng và gửi email khi quay về từ VNPay thành công
+                            await BasketService.ClearBasketAsync();
+                            await EmailService.SendOrderConfirmationEmailAsync(checkoutForm.Email, checkoutForm.FullName, transaction.OrderId.ToString(), transaction.Amount);
+                            
+                            await Task.Delay(2000);
+                            Navigation.NavigateTo($"/success/{transaction.OrderId}");
+                        }
+                        else
+                        {
+                            errorMessage = "Không tìm thấy thông tin giao dịch.";
+                        }
                     }
                     else
                     {
-                        errorMessage = "Không tìm thấy thông tin giao dịch.";
+                        errorMessage = "Không thể cập nhật trạng thái giao dịch.";
                     }
                 }
             }
             else
             {
+                // Payment failed - update status to Failed
+                if (query.TryGetValue("vnp_TxnRef", out var txnRefStr) && Guid.TryParse(txnRefStr, out var txnId))
+                {
+                    await PaymentApiService.UpdateTransactionStatusAsync(txnId, "Failed");
+                }
                 errorMessage = $"Thanh toán VNPay thất bại. Mã lỗi: {responseCode}";
             }
 

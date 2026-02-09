@@ -7,119 +7,91 @@ namespace Payment.API.Utils
 {
     public class VnPayLibrary
     {
-        private readonly SortedList<string, string> _requestData = new SortedList<string, string>(new VnPayCompare());
-        private readonly SortedList<string, string> _responseData = new SortedList<string, string>(new VnPayCompare());
+        private readonly SortedList<string, string> _requestData = new(new VnPayCompare());
+        private readonly SortedList<string, string> _responseData = new(new VnPayCompare());
 
         public void AddRequestData(string key, string value)
         {
             if (!string.IsNullOrEmpty(value))
-            {
                 _requestData.Add(key, value);
-            }
         }
 
         public void AddResponseData(string key, string value)
         {
             if (!string.IsNullOrEmpty(value))
-            {
                 _responseData.Add(key, value);
-            }
         }
 
-        public string GetResponseData(string key)
-        {
-            return _responseData.TryGetValue(key, out var value) ? value : string.Empty;
-        }
+        public string GetResponseData(string key) =>
+            _responseData.TryGetValue(key, out var v) ? v : "";
 
-        public string CreateRequestUrl(string baseUrl, string vnpHashSecret)
+        public string CreateRequestUrl(string baseUrl, string hashSecret)
         {
-            StringBuilder hashData = new StringBuilder();
-            StringBuilder queryString = new StringBuilder();
-
-            foreach (KeyValuePair<string, string> kv in _requestData)
+            var data = new StringBuilder();
+            foreach (var kv in _requestData)
             {
                 if (!string.IsNullOrEmpty(kv.Value))
                 {
-                    // Hash Data: key=value (NO encoding)
-                    hashData.Append(kv.Key + "=" + kv.Value + "&");
-
-                    // Query String: key=value (WITH URL encoding)
-                    queryString.Append(WebUtility.UrlEncode(kv.Key) + "=" + WebUtility.UrlEncode(kv.Value) + "&");
+                    data.Append(StandardUrlEncode(kv.Key) + "=" + StandardUrlEncode(kv.Value) + "&");
                 }
             }
 
-            // Remove last '&'
-            string rawHash = hashData.ToString().TrimEnd('&');
-            string query = queryString.ToString().TrimEnd('&');
+            string queryString = data.ToString().TrimEnd('&');
+            string secureHash = HmacSHA512(hashSecret, queryString);
 
-            // Calculate HMAC SHA512
-            string vnpSecureHash = HmacSHA512(vnpHashSecret, rawHash);
+            Console.WriteLine("=== [PAYMENT_VERIFY] VNPay Request Debug ===");
+            Console.WriteLine($"Raw Data: {queryString}");
+            Console.WriteLine($"Secret: {hashSecret}");
+            Console.WriteLine($"Hash: {secureHash}");
+            Console.WriteLine("===========================");
 
-            // Final URL
-            return $"{baseUrl}?{query}&vnp_SecureHash={vnpSecureHash}";
+            return $"{baseUrl}?{queryString}&vnp_SecureHash={secureHash}";
         }
 
         public bool ValidateSignature(string inputHash, string secretKey)
         {
-            string rspRaw = GetResponseRaw();
-            string myChecksum = HmacSHA512(secretKey, rspRaw);
-            return myChecksum.Equals(inputHash, StringComparison.InvariantCultureIgnoreCase);
-        }
-
-        private string GetResponseRaw()
-        {
-            StringBuilder data = new StringBuilder();
-
-            // Remove vnp_SecureHash and vnp_SecureHashType before hashing
-            if (_responseData.ContainsKey("vnp_SecureHashType"))
+            var data = new StringBuilder();
+            foreach (var kv in _responseData)
             {
-                _responseData.Remove("vnp_SecureHashType");
-            }
-            if (_responseData.ContainsKey("vnp_SecureHash"))
-            {
-                _responseData.Remove("vnp_SecureHash");
-            }
+                if (kv.Key == "vnp_SecureHash" || kv.Key == "vnp_SecureHashType")
+                    continue;
 
-            foreach (KeyValuePair<string, string> kv in _responseData)
-            {
                 if (!string.IsNullOrEmpty(kv.Value))
                 {
-                    // ⚠️ KHÔNG URL ENCODE khi tính hash
-                    data.Append(kv.Key + "=" + kv.Value + "&");
+                    data.Append(StandardUrlEncode(kv.Key) + "=" + StandardUrlEncode(kv.Value) + "&");
                 }
             }
 
-            // Remove trailing '&'
-            return data.ToString().TrimEnd('&');
+            string rawData = data.ToString().TrimEnd('&');
+            string myHash = HmacSHA512(secretKey, rawData);
+
+            Console.WriteLine("=== [PAYMENT_VERIFY] VNPay Callback Debug ===");
+            Console.WriteLine($"Raw Data: {rawData}");
+            Console.WriteLine($"Secret: {secretKey}");
+            Console.WriteLine($"Input Hash: {inputHash}");
+            Console.WriteLine($"My Hash: {myHash}");
+            Console.WriteLine("============================");
+
+            return myHash.Equals(inputHash, StringComparison.InvariantCultureIgnoreCase);
         }
 
-        public static string HmacSHA512(string key, string inputData)
+        private string StandardUrlEncode(string str)
         {
-            var hash = new StringBuilder();
-            byte[] keyBytes = Encoding.UTF8.GetBytes(key);
-            byte[] inputBytes = Encoding.UTF8.GetBytes(inputData);
-            using (var hmac = new HMACSHA512(keyBytes))
-            {
-                byte[] hashValue = hmac.ComputeHash(inputBytes);
-                foreach (var theByte in hashValue)
-                {
-                    hash.Append(theByte.ToString("x2"));
-                }
-            }
+            return WebUtility.UrlEncode(str);
+        }
 
-            return hash.ToString();
+        public static string HmacSHA512(string key, string input)
+        {
+            byte[] keyBytes = Encoding.UTF8.GetBytes(key);
+            byte[] inputBytes = Encoding.UTF8.GetBytes(input);
+            using var hmac = new HMACSHA512(keyBytes);
+            byte[] hashBytes = hmac.ComputeHash(inputBytes);
+            return BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
         }
     }
 
-    public class VnPayCompare : IComparer<string>
+    public class VnPayCompare : IComparer<string?>
     {
-        public int Compare(string? x, string? y)
-        {
-            if (x == y) return 0;
-            if (x == null) return -1;
-            if (y == null) return 1;
-            var vnpCompare = CompareInfo.GetCompareInfo("en-US");
-            return vnpCompare.Compare(x, y, CompareOptions.Ordinal);
-        }
+        public int Compare(string? x, string? y) => string.CompareOrdinal(x, y);
     }
 }

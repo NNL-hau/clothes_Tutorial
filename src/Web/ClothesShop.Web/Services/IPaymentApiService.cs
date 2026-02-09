@@ -24,5 +24,10 @@ namespace ClothesShop.Web.Services
         /// Verify payment status sau khi callback từ VNPay
         /// </summary>
         Task<bool> VerifyPaymentStatusAsync(Guid transactionId, string expectedStatus);
+        
+        /// <summary>
+        /// Update transaction status (DEMO MODE - no verification)
+        /// </summary>
+        Task<bool> UpdateTransactionStatusAsync(Guid transactionId, string status);
     }
 }

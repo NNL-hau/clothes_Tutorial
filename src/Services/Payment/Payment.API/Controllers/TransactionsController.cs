@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Net;
 using Payment.API.Data;
 using Payment.API.Models;
 using Payment.API.DTOs;
@@ -31,6 +32,48 @@ namespace Payment.API.Controllers
                 .ToListAsync();
         }
 
+        /// <summary>
+        /// DEMO MODE: Simple status update endpoint for frontend (no signature verification)
+        /// </summary>
+        [HttpPatch("{id}/status")]
+        public async Task<IActionResult> UpdateTransactionStatus(Guid id, [FromBody] UpdateStatusRequest request)
+        {
+            var transaction = await _context.Transactions.FindAsync(id);
+            if (transaction == null)
+            {
+                return NotFound(new { message = "Transaction not found" });
+            }
+
+            transaction.Status = request.Status;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Transaction {Id} status updated to {Status} (DEMO MODE - no verification)", id, request.Status);
+
+            // If successful, update order status
+            if (request.Status == "Success")
+            {
+                try
+                {
+                    using var client = new HttpClient();
+                    var orderingUrl = _configuration["OrderingApiUrl"] ?? "http://ordering-api/api/orders";
+                    var updateDto = new { Status = "Pending" };
+                    var response = await client.PatchAsJsonAsync($"{orderingUrl}/{transaction.OrderId}/status", updateDto);
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        _logger.LogError("Failed to update Order {OrderId} status", transaction.OrderId);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error calling Ordering API for Order {OrderId}", transaction.OrderId);
+                }
+            }
+
+            return Ok(new { message = "Status updated successfully", status = transaction.Status });
+        }
+
+
         [HttpGet("callback")]
         public async Task<IActionResult> ProcessCallback()
         {
@@ -50,23 +93,35 @@ namespace Payment.API.Controllers
             string txnRef = vnpay.GetResponseData("vnp_TxnRef");
             string responseCode = vnpay.GetResponseData("vnp_ResponseCode");
             string vnp_SecureHash = Request.Query["vnp_SecureHash"]!;
-            string vnp_HashSecret = _configuration["VnPay:HashSecret"]!;
-
+            string vnp_HashSecret = _configuration["Payment:VNPay:HashSecret"]!;
             bool isValidSignature = vnpay.ValidateSignature(vnp_SecureHash, vnp_HashSecret);
 
             if (isValidSignature)
             {
-                // We update status in Callback too as a fallback for IPN
+                _logger.LogInformation("[PAYMENT_VERIFY] VNPay Callback: Signature Valid. Updating status for TxnRef: {TxnRef}", txnRef);
                 await UpdateTransactionStatus(txnRef, responseCode, vnpay.GetResponseData("vnp_TransactionStatus"));
             }
             else
             {
-                _logger.LogWarning("VNPay Callback: Invalid Signature for TxnRef: {TxnRef}", txnRef);
+                _logger.LogError("[PAYMENT_VERIFY] VNPay Callback: INVALID SIGNATURE for TxnRef: {TxnRef}", txnRef);
+                responseCode = "99"; // Signal signature error to client
             }
 
-            // Redirect back to client with status
-            var returnUrl = _configuration["VnPay:ReturnUrl"] ?? "http://localhost:5000/checkout";
-            return Redirect($"{returnUrl}?vnp_TxnRef={txnRef}&vnp_ResponseCode={responseCode}");
+            // Redirect back to client with status aligned with frontend (CheckoutResult.razor)
+            var webAppUrl = _configuration["WebAppUrl"] ?? "http://localhost:5078";
+            
+            bool isSuccess = responseCode == "00" && isValidSignature;
+            string msg = isSuccess ? "Thanh toán thành công" : "Thanh toán thất bại hoặc lỗi chữ ký";
+            
+            // Fetch transaction to get OrderId
+            string orderId = "";
+            if (Guid.TryParse(txnRef, out var tId))
+            {
+                var transaction = await _context.Transactions.FindAsync(tId);
+                orderId = transaction?.OrderId.ToString() ?? "";
+            }
+
+            return Redirect($"{webAppUrl}/checkout/result?success={isSuccess.ToString().ToLower()}&orderId={orderId}&message={WebUtility.UrlEncode(msg)}");
         }
 
         [HttpGet("vnpay-ipn")]
@@ -88,7 +143,7 @@ namespace Payment.API.Controllers
             string txnRef = vnpay.GetResponseData("vnp_TxnRef");
             string responseCode = vnpay.GetResponseData("vnp_ResponseCode");
             string vnp_SecureHash = Request.Query["vnp_SecureHash"]!;
-            string vnp_HashSecret = _configuration["VnPay:HashSecret"]!;
+            string vnp_HashSecret = _configuration["Payment:VNPay:HashSecret"]!;
 
             bool isValidSignature = vnpay.ValidateSignature(vnp_SecureHash, vnp_HashSecret);
 
@@ -140,7 +195,7 @@ namespace Payment.API.Controllers
             if (responseCode == "00" && (string.IsNullOrEmpty(transactionStatus) || transactionStatus == "00"))
             {
                 transaction.Status = "Success";
-                _logger.LogInformation("Transaction {TxnRef} successful. Updating Order {OrderId} to Pending.", txnRef, transaction.OrderId);
+                _logger.LogInformation("[PAYMENT_VERIFY] Transaction {TxnRef} successful. Updating Order {OrderId} to Pending.", txnRef, transaction.OrderId);
                 
                 try 
                 {
@@ -163,7 +218,7 @@ namespace Payment.API.Controllers
             else
             {
                 transaction.Status = "Failed";
-                _logger.LogWarning("Transaction {TxnRef} failed with code {Code}", txnRef, responseCode);
+                _logger.LogWarning("[PAYMENT_VERIFY] Transaction {TxnRef} failed with code {Code}", txnRef, responseCode);
             }
 
             await _context.SaveChangesAsync();
@@ -230,48 +285,47 @@ namespace Payment.API.Controllers
         private string GenerateVnPayUrl(Transaction transaction, CreateTransactionDto dto)
         {
             var vnpay = new Utils.VnPayLibrary();
-            var vnp_TmnCode = _configuration["Payment:VNPay:TmnCode"];
-            var vnp_HashSecret = _configuration["Payment:VNPay:HashSecret"];
-            var vnp_Url = _configuration["Payment:VNPay:PaymentUrl"];
-            var vnp_ReturnUrl = _configuration["Payment:VNPay:ReturnUrl"];
+            var vnp_TmnCode = _configuration["Payment:VNPay:TmnCode"] ?? "";
+            var vnp_HashSecret = _configuration["Payment:VNPay:HashSecret"] ?? "";
+            var vnp_Url = _configuration["Payment:VNPay:PaymentUrl"] ?? "";
+            var vnp_ReturnUrl = _configuration["Payment:VNPay:ReturnUrl"] ?? "";
 
-            vnpay.AddRequestData("vnp_Version", "2.1.0");
-            vnpay.AddRequestData("vnp_Command", "pay");
-            vnpay.AddRequestData("vnp_TmnCode", vnp_TmnCode!);
+            if (string.IsNullOrEmpty(vnp_TmnCode) || string.IsNullOrEmpty(vnp_HashSecret))
+            {
+                throw new Exception("VNPay Configuration is missing TmnCode or HashSecret");
+            }
 
-            // Amount x 100
+            // ===== VNPay yêu cầu giờ Việt Nam (UTC+7) =====
+            var vnTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+            var vnTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vnTimeZone);
+            string vnp_CreateDate = vnTime.ToString("yyyyMMddHHmmss");
+            string vnp_ExpireDate = vnTime.AddMinutes(15).ToString("yyyyMMddHHmmss");
+
+            vnpay.AddRequestData("vnp_Version", _configuration["Payment:VNPay:Version"] ?? "2.1.0");
+            vnpay.AddRequestData("vnp_Command", _configuration["Payment:VNPay:Command"] ?? "pay");
+            vnpay.AddRequestData("vnp_TmnCode", vnp_TmnCode.Trim());
             vnpay.AddRequestData("vnp_Amount", ((long)(transaction.Amount * 100)).ToString());
+            vnpay.AddRequestData("vnp_CurrCode", _configuration["Payment:VNPay:CurrCode"] ?? "VND");
+            vnpay.AddRequestData("vnp_BankCode", ""); // Default to empty to allow user to choose on VNPay portal
+            vnpay.AddRequestData("vnp_CreateDate", vnp_CreateDate);
+            vnpay.AddRequestData("vnp_IpAddr", GetClientIpAddress());
+            vnpay.AddRequestData("vnp_Locale", _configuration["Payment:VNPay:Locale"] ?? "vn");
 
-            // Create date: yyyyMMddHHmmss
-            vnpay.AddRequestData("vnp_CreateDate", transaction.CreatedAt.ToString("yyyyMMddHHmmss"));
-
-            vnpay.AddRequestData("vnp_CurrCode", "VND");
-
-            string ipAddr = GetClientIpAddress();
-            if (ipAddr == "::1") ipAddr = "127.0.0.1";
-            vnpay.AddRequestData("vnp_IpAddr", ipAddr);
-
-            vnpay.AddRequestData("vnp_Locale", "vn");
-
-            //  QUAN TRỌNG: KHÔNG DÙNG TIẾNG VIỆT CÓ DẤU
-            string orderIdShort = transaction.OrderId.ToString().Substring(0, 8);
-            string orderInfo = $"Pay for order {orderIdShort}"; //  Chỉ dùng ASCII
-            vnpay.AddRequestData("vnp_OrderInfo", orderInfo);
-
+            // vnp_OrderInfo không nên có dấu và không nên quá phức tạp
+            vnpay.AddRequestData("vnp_OrderInfo", "Thanh toan don hang");
             vnpay.AddRequestData("vnp_OrderType", "other");
-            vnpay.AddRequestData("vnp_ReturnUrl", vnp_ReturnUrl!);
+            vnpay.AddRequestData("vnp_ReturnUrl", vnp_ReturnUrl);
+            vnpay.AddRequestData("vnp_TxnRef", transaction.Id.ToString());
+            vnpay.AddRequestData("vnp_ExpireDate", vnp_ExpireDate);
 
-            // TxnRef: dùng format N (32 ký tự không dấu gạch ngang)
-            vnpay.AddRequestData("vnp_TxnRef", transaction.Id.ToString("N"));
-
-            _logger.LogInformation("VNPay Parameters: TmnCode={TmnCode}, Amount={Amount}, TxnRef={TxnRef}",
-                vnp_TmnCode, transaction.Amount * 100, transaction.Id.ToString("N"));
-
-            return vnpay.CreateRequestUrl(vnp_Url!, vnp_HashSecret!);
+            string finalUrl = vnpay.CreateRequestUrl(vnp_Url, vnp_HashSecret.Trim());
+            _logger.LogInformation("VNPay Request URL: {Url}", finalUrl);
+            return finalUrl;
         }
 
         private string GetClientIpAddress()
         {
+            // Lấy IP client (đã qua middleware ForwardedHeaders)
             var forwardedFor = Request.Headers["X-Forwarded-For"].FirstOrDefault();
             if (!string.IsNullOrEmpty(forwardedFor))
             {

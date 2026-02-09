@@ -1,0 +1,218 @@
+@page "/my-orders"
+@inherits AuthorizedPageBase
+@inject IOrderApiService OrderService
+@inject IAuthService AuthService
+@using ClothesShop.Web.Models
+
+<div class="user-orders-container animate__animated animate__fadeIn">
+    <div class="orders-header">
+        <h1 class="page-title">Đơn hàng của tôi</h1>
+        <p class="text-muted">Theo dõi và quản lý lịch sử mua sắm của bạn</p>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-state">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-3">Đang tải danh sách đơn hàng...</p>
+        </div>
+    }
+    else if (!userOrders.Any())
+    {
+        <div class="empty-orders-state shadow-sm">
+            <i class="bi bi-box-seam"></i>
+            <p>Bạn chưa có đơn hàng nào.</p>
+            <a href="/" class="btn btn-primary">MUA SẮM NGAY</a>
+        </div>
+    }
+    else
+    {
+        <div class="orders-list">
+            @foreach (var order in userOrders)
+            {
+                <div class="order-card shadow-sm mb-4">
+                    <div class="order-card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="order-id">Mã đơn: <strong>#@order.Id.ToString().Substring(0, 8).ToUpper()</strong></span>
+                            <span class="order-date ms-3">@order.CreatedAt.ToString("dd/MM/yyyy HH:mm")</span>
+                        </div>
+                        <span class="status-badge" style="background: @GetStatusBg(order.OrderStatus); color: @GetStatusColor(order.OrderStatus);">
+                            @TranslateStatus(order.OrderStatus)
+                        </span>
+                    </div>
+                    <div class="order-card-body p-4">
+                        <div class="order-items-mini">
+                            @foreach (var item in order.OrderItems.Take(2))
+                            {
+                                <div class="item-mini mb-2">
+                                    <span class="item-name">@item.ProductName</span>
+                                    <span class="item-qty text-muted">x@item.Quantity</span>
+                                </div>
+                            }
+                            @if (order.OrderItems.Count > 2)
+                            {
+                                <div class="text-muted small">... và @(order.OrderItems.Count - 2) sản phẩm khác</div>
+                            }
+                        </div>
+                        <hr />
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="text-muted">Tổng tiền:</span>
+                                <span class="total-price ms-2">@order.TotalPrice.ToString("N0") đ</span>
+                            </div>
+                            <button class="btn btn-outline-dark btn-sm" @onclick='() => ViewDetails(order.Id)'>
+                                Chi tiết
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .user-orders-container {
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 0 20px;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .page-title {
+        font-weight: 800;
+        font-size: 2rem;
+        color: #1a202c;
+    }
+
+    .loading-state, .empty-orders-state {
+        text-align: center;
+        padding: 80px 0;
+        background: #fff;
+        border-radius: 16px;
+    }
+
+    .empty-orders-state i {
+        font-size: 60px;
+        color: #e2e8f0;
+        margin-bottom: 20px;
+        display: block;
+    }
+
+    .order-card {
+        background: #fff;
+        border-radius: 16px;
+        overflow: hidden;
+        border: none;
+        transition: transform 0.2s;
+    }
+
+    .order-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .order-card-header {
+        background: #f8fafc;
+        padding: 15px 25px;
+        border-bottom: 1px solid #edf2f7;
+    }
+
+    .order-id { font-size: 14px; }
+    .order-date { font-size: 13px; color: #718096; }
+
+    .status-badge {
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .total-price {
+        font-weight: 700;
+        font-size: 1.2rem;
+        color: #e53e3e;
+    }
+
+    .item-name {
+        font-weight: 500;
+        font-size: 0.95rem;
+    }
+
+    .btn-primary {
+        background: #2D3748;
+        border: none;
+        padding: 12px 30px;
+        font-weight: 600;
+        border-radius: 10px;
+    }
+</style>
+
+@code {
+    private List<OrderDto> userOrders = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrders();
+    }
+
+    private async Task LoadOrders()
+    {
+        isLoading = true;
+        try
+        {
+            var allOrders = await OrderService.GetOrdersAsync();
+            var currentUser = AuthService.CurrentUser;
+            if (currentUser != null)
+            {
+                userOrders = allOrders.Where(o => o.UserName == currentUser.Email)
+                                     .OrderByDescending(o => o.CreatedAt)
+                                     .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading user orders: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string TranslateStatus(string status) => status switch
+    {
+        "AwaitingPayment" => "Chờ thanh toán",
+        "Pending" => "Chờ xử lý",
+        "InProgress" => "Đang xử lý",
+        "Shipped" => "Đã giao hàng",
+        "Cancelled" => "Đã hủy",
+        _ => status
+    };
+
+    private string GetStatusBg(string status) => status switch
+    {
+        "Shipped" => "#def7ec",
+        "AwaitingPayment" => "#fdf2f2",
+        "Pending" => "#fef3c7",
+        "InProgress" => "#e1effe",
+        "Cancelled" => "#f3f4f6",
+        _ => "#f3f4f6"
+    };
+
+    private string GetStatusColor(string status) => status switch
+    {
+        "Shipped" => "#03543f",
+        "AwaitingPayment" => "#9b1c1c",
+        "Pending" => "#92400e",
+        "InProgress" => "#1e429f",
+        "Cancelled" => "#4b5563",
+        _ => "#4b5563"
+    };
+
+    private void ViewDetails(Guid orderId)
+    {
+        Navigation.NavigateTo($"/success/{orderId}");
+    }
+}

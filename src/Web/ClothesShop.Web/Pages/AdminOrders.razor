@@ -58,6 +58,7 @@
                             <th>Khách hàng</th>
                             <th>Thời gian đặt</th>
                             <th>Tổng tiền</th>
+                            <th>Phương thức</th>
                             <th>Trạng thái</th>
                             <th class="text-center">Thao tác</th>
                         </tr>
@@ -78,6 +79,12 @@
                                     <div style="font-size: 0.8rem; color: var(--text-muted);">@o.CreatedAt.ToString("HH:mm")</div>
                                 </td>
                                 <td class="price-cell">@o.TotalPrice.ToString("N0") ₫</td>
+                                <td>
+                                    <span class="payment-method-badge">
+                                        <i class='@(o.PaymentMethodName == "VNPay" ? "fa-solid fa-credit-card" : "fa-solid fa-money-bill-1") me-1'></i>
+                                        @o.PaymentMethodName
+                                    </span>
+                                </td>
                                 <td>
                                     <span class="status-badge-order" style="background: @GetStatusBg(o.OrderStatus); color: @GetStatusColor(o.OrderStatus);">
                                         @TranslateStatus(o.OrderStatus)
@@ -125,6 +132,19 @@
                         <h6 class="text-muted mb-2">Khách hàng</h6>
                         <p class="mb-0"><strong>@selectedOrder.UserName</strong></p>
                     </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Thông tin thanh toán</h6>
+                        <p class="mb-0">
+                            <strong>@selectedOrder.PaymentMethodName</strong>
+                            @if (selectedOrder.PaymentMethodName == "VNPay")
+                            {
+                                <NavLink href="/admin/payments" class="ms-2 small text-primary"><i class="fa-solid fa-arrow-up-right-from-square"></i> Xem Giao dịch</NavLink>
+                            }
+                        </p>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
                     <div class="col-md-6">
                         <h6 class="text-muted mb-2">Ngày đặt</h6>
                         <p class="mb-0">@selectedOrder.CreatedAt.ToString("dd/MM/yyyy HH:mm")</p>
@@ -245,6 +265,17 @@
         border-radius: 10px;
         font-weight: 700;
         font-size: 0.8rem;
+    }
+
+    .payment-method-badge {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-main);
+        background: #f1f5f9;
+        padding: 0.3rem 0.7rem;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
     }
 
     .order-items {
