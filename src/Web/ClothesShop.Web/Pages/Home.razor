@@ -1,4 +1,6 @@
 ﻿@page "/"
+@inject NavigationManager Navigation
+@inject ICategoryApiService CategoryService
 
 <PageTitle>Trang Chủ - Shop Quần Áo</PageTitle>
 
@@ -42,7 +44,7 @@
                     </div>
                     <div class="feature-text">
                         <h4>Hỗ trợ 24/7</h4>
-                        <p>Tận tâm & Chu đáo</p>
+                        <p>Tận tâm &amp; Chu đáo</p>
                     </div>
                 </div>
             </div>
@@ -78,11 +80,133 @@
             </div>
         </div>
     </section>
-    
-    <!-- Main Product List -->
+
+    <!-- Product Section with Filter Panel -->
     <section class="products-section">
         <div class="container">
-            <ProductList Title="SẢN PHẨM MỚI NHẤT" InitialCount="12" />
+            <div class="section-title">
+                <h2>LỌC SẢN PHẨM</h2>
+                <div class="title-underline"></div>
+            </div>
+
+            <!-- Filter Panel -->
+            <div class="home-filter-panel">
+                <!-- Row 1: Search + Category chips -->
+                <div class="filter-row filter-row-top">
+                    <!-- Search -->
+                    <div class="filter-group filter-search">
+                        <label class="filter-label"><i class="fa-solid fa-magnifying-glass me-1"></i> Tìm kiếm</label>
+                        <div class="search-wrap">
+                            <input type="text"
+                                   @bind="tempSearch"
+                                   @bind:event="oninput"
+                                   @onkeyup="HandleKeyUp"
+                                   placeholder="Tên sản phẩm..."
+                                   class="filter-input" />
+                            @if (!string.IsNullOrEmpty(tempSearch))
+                            {
+                                <button class="clear-btn" @onclick="() => tempSearch = string.Empty">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Price range -->
+                    <div class="filter-group filter-price">
+                        <label class="filter-label"><i class="fa-solid fa-tag me-1"></i> Khoảng giá</label>
+                        <div class="price-row">
+                            <input type="number" @bind="minPrice" placeholder="Từ (đ)" class="filter-input price-input" min="0" />
+                            <span class="price-sep">—</span>
+                            <input type="number" @bind="maxPrice" placeholder="Đến (đ)" class="filter-input price-input" min="0" />
+                        </div>
+                    </div>
+
+                    <!-- Sort -->
+                    <div class="filter-group filter-sort">
+                        <label class="filter-label"><i class="fa-solid fa-arrow-up-wide-short me-1"></i> Sắp xếp giá</label>
+                        <div class="sort-pills">
+                            <button class="sort-pill @(tempSortOrder == "price_asc" ? "active" : "")"
+                                    @onclick='() => ToggleSort("price_asc")'>
+                                <i class="fa-solid fa-arrow-up"></i> Tăng dần
+                            </button>
+                            <button class="sort-pill @(tempSortOrder == "price_desc" ? "active" : "")"
+                                    @onclick='() => ToggleSort("price_desc")'>
+                                <i class="fa-solid fa-arrow-down"></i> Giảm dần
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Stock -->
+                    <div class="filter-group filter-stock">
+                        <label class="filter-label"><i class="fa-solid fa-box me-1"></i> Trạng thái</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" @bind="inStockOnly" />
+                            <span class="toggle-track">
+                                <span class="toggle-thumb"></span>
+                            </span>
+                            <span class="toggle-text">Còn hàng</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Row 2: Category chips -->
+                <div class="filter-row filter-row-cats">
+                    <label class="filter-label"><i class="fa-solid fa-grid-2 me-1"></i> Danh mục</label>
+                    <div class="cat-chips">
+                        <button class="cat-chip @(string.IsNullOrEmpty(tempCategory) ? "active" : "")"
+                                @onclick='() => tempCategory = string.Empty'>
+                            Tất cả
+                        </button>
+                        @if (categories != null)
+                        {
+                            @foreach (var cat in categories)
+                            {
+                                <button class="cat-chip @(tempCategory == cat.Name ? "active" : "")"
+                                        @onclick="() => tempCategory = cat.Name">
+                                    @cat.Name
+                                </button>
+                            }
+                        }
+                    </div>
+                </div>
+
+                <!-- Action Row -->
+                <div class="filter-row filter-row-actions">
+                    <div class="active-filters">
+                        @if (!string.IsNullOrEmpty(appliedSearch))
+                        {
+                            <span class="active-tag">🔍 @appliedSearch <button @onclick="() => { appliedSearch = null; tempSearch = string.Empty; ApplyFilters(); }">×</button></span>
+                        }
+                        @if (!string.IsNullOrEmpty(appliedCategory))
+                        {
+                            <span class="active-tag">📂 @appliedCategory <button @onclick="() => { appliedCategory = null; tempCategory = string.Empty; ApplyFilters(); }">×</button></span>
+                        }
+                        @if (appliedMinPrice.HasValue || appliedMaxPrice.HasValue)
+                        {
+                            <span class="active-tag">💰 @(appliedMinPrice.HasValue ? appliedMinPrice + "đ" : "0") — @(appliedMaxPrice.HasValue ? appliedMaxPrice + "đ" : "∞") <button @onclick="() => { appliedMinPrice = null; appliedMaxPrice = null; minPrice = null; maxPrice = null; ApplyFilters(); }">×</button></span>
+                        }
+                    </div>
+                    <div class="action-btns">
+                        <button class="btn-apply" @onclick="ApplyFilters">
+                            <i class="fa-solid fa-filter me-1"></i> Áp dụng
+                        </button>
+                        <button class="btn-reset" @onclick="ResetFilters">
+                            <i class="fa-solid fa-rotate-left me-1"></i> Đặt lại
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product List -->
+            <ProductList Title="@ProductListTitle"
+                         InitialCount="12"
+                         CategoryKeyword="@appliedCategory"
+                         SearchKeyword="@appliedSearch"
+                         MinPrice="@appliedMinPrice"
+                         MaxPrice="@appliedMaxPrice"
+                         InStockOnly="@appliedInStockOnly"
+                         SortOrder="@appliedSortOrder" />
         </div>
     </section>
 </div>
@@ -91,12 +215,81 @@
 @inject IAuthService AuthService
 
 @code {
+    private List<CategoryDto> categories = new();
+
+    // Temp (UI state)
+    private string tempSearch = "";
+    private string tempCategory = "";
+    private decimal? minPrice;
+    private decimal? maxPrice;
+    private bool inStockOnly;
+    private string? tempSortOrder;
+
+    // Applied (passed to ProductList)
+    private string? appliedSearch;
+    private string? appliedCategory;
+    private decimal? appliedMinPrice;
+    private decimal? appliedMaxPrice;
+    private bool appliedInStockOnly;
+    private string? appliedSortOrder;
+
     protected override async Task OnInitializedAsync()
     {
         var role = await AuthService.GetUserRoleAsync();
         if (role == "Admin")
         {
             Navigation.NavigateTo("/admin");
+        }
+        
+        categories = await CategoryService.GetCategoriesAsync();
+    }
+
+    private void HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") ApplyFilters();
+    }
+
+    private void ToggleSort(string order)
+    {
+        tempSortOrder = tempSortOrder == order ? null : order;
+    }
+
+    private void ApplyFilters()
+    {
+        appliedSearch = string.IsNullOrWhiteSpace(tempSearch) ? null : tempSearch.Trim();
+        appliedCategory = string.IsNullOrWhiteSpace(tempCategory) ? null : tempCategory;
+        appliedMinPrice = minPrice;
+        appliedMaxPrice = maxPrice;
+        appliedInStockOnly = inStockOnly;
+        appliedSortOrder = tempSortOrder;
+        StateHasChanged();
+    }
+
+    private void ResetFilters()
+    {
+        tempSearch = "";
+        tempCategory = "";
+        minPrice = null;
+        maxPrice = null;
+        inStockOnly = false;
+        tempSortOrder = null;
+        appliedSearch = null;
+        appliedCategory = null;
+        appliedMinPrice = null;
+        appliedMaxPrice = null;
+        appliedInStockOnly = false;
+        appliedSortOrder = null;
+        StateHasChanged();
+    }
+
+    private string ProductListTitle
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrEmpty(appliedCategory)) parts.Add(appliedCategory.ToUpper());
+            if (!string.IsNullOrEmpty(appliedSearch)) parts.Add($"TÌM KIẾM: \"{appliedSearch}\"");
+            return parts.Count > 0 ? string.Join(" - ", parts) : "TẤT CẢ SẢN PHẨM";
         }
     }
 }
@@ -112,7 +305,7 @@
         padding: 0 20px;
     }
 
-    /* Features Section */
+    /* ── Features ── */
     .features-section {
         padding: 40px 0;
         background: white;
@@ -157,7 +350,7 @@
         color: #777;
     }
 
-    /* Category Spotlight */
+    /* ── Category Spotlight ── */
     .category-spotlight {
         padding: 80px 0;
     }
@@ -205,31 +398,22 @@
     .spotlight-item::before {
         content: '';
         position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
         background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.7));
         transition: opacity 0.3s;
     }
 
-    .spotlight-item:hover {
-        transform: scale(1.02);
-    }
-
-    .spotlight-item:hover::before {
-        background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.85));
-    }
+    .spotlight-item:hover { transform: scale(1.02); }
+    .spotlight-item:hover::before { background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.85)); }
 
     .spotlight-item.male {
         grid-row: span 2;
         background-image: url('https://images.unsplash.com/photo-1490578474895-699cd4e2cf59?auto=format&fit=crop&q=80&w=1000');
     }
-
     .spotlight-item.female {
         background-image: url('https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&q=80&w=1000');
     }
-
     .spotlight-item.accessory {
         background-image: url('https://images.unsplash.com/photo-1523381235312-071e274b914d?auto=format&fit=crop&q=80&w=1000');
     }
@@ -258,40 +442,276 @@
         text-transform: uppercase;
         transition: all 0.3s;
     }
+    .spotlight-item:hover .btn-discover { background: #ffcc00; }
 
-    .spotlight-item:hover .btn-discover {
-        background: #ffcc00;
-        color: #2F4858;
-    }
-
-    /* Product Section */
+    /* ── Products Section ── */
     .products-section {
-        padding-bottom: 80px;
+        padding: 60px 0 80px;
     }
 
+    /* ── Home Filter Panel ── */
+    .home-filter-panel {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 24px rgba(47,72,88,0.08);
+        padding: 28px 32px;
+        margin-bottom: 40px;
+        border: 1px solid #f0f0f0;
+    }
+
+    .filter-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 24px;
+        flex-wrap: wrap;
+    }
+
+    .filter-row-top {
+        border-bottom: 1px solid #f3f3f3;
+        padding-bottom: 22px;
+        margin-bottom: 18px;
+    }
+
+    .filter-row-cats {
+        align-items: center;
+        border-bottom: 1px solid #f3f3f3;
+        padding-bottom: 18px;
+        margin-bottom: 18px;
+    }
+
+    .filter-row-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .filter-search { flex: 2; min-width: 220px; }
+    .filter-price  { flex: 2; min-width: 240px; }
+    .filter-sort   { flex: 1.5; min-width: 180px; }
+    .filter-stock  { flex: 1; min-width: 130px; }
+
+    .filter-label {
+        font-size: 12px;
+        font-weight: 700;
+        color: #2F4858;
+        letter-spacing: 0.6px;
+        text-transform: uppercase;
+    }
+
+    /* Input */
+    .filter-input {
+        padding: 10px 14px;
+        border: 1.5px solid #e0e0e0;
+        border-radius: 10px;
+        font-size: 14px;
+        color: #333;
+        background: #fafafa;
+        transition: border-color 0.25s, box-shadow 0.25s;
+        width: 100%;
+    }
+    .filter-input:focus {
+        border-color: #2F4858;
+        box-shadow: 0 0 0 3px rgba(47,72,88,0.1);
+        outline: none;
+        background: white;
+    }
+
+    /* Search wrap */
+    .search-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+    .search-wrap .filter-input { padding-right: 36px; }
+    .clear-btn {
+        position: absolute;
+        right: 10px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #aaa;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        padding: 2px;
+        transition: color 0.2s;
+    }
+    .clear-btn:hover { color: #555; }
+
+    /* Price row */
+    .price-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .price-input { flex: 1; }
+    .price-sep { color: #bbb; font-size: 18px; flex-shrink: 0; }
+
+    /* Sort pills */
+    .sort-pills {
+        display: flex;
+        gap: 8px;
+    }
+    .sort-pill {
+        padding: 9px 14px;
+        border-radius: 10px;
+        border: 1.5px solid #e0e0e0;
+        background: #fafafa;
+        color: #555;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .sort-pill:hover { border-color: #2F4858; color: #2F4858; background: #f0f4f7; }
+    .sort-pill.active { background: #2F4858; color: white; border-color: #2F4858; }
+
+    /* Toggle switch */
+    .toggle-switch {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        user-select: none;
+        margin-top: 4px;
+    }
+    .toggle-switch input { display: none; }
+    .toggle-track {
+        width: 44px;
+        height: 24px;
+        background: #ddd;
+        border-radius: 12px;
+        position: relative;
+        transition: background 0.3s;
+        flex-shrink: 0;
+    }
+    .toggle-switch input:checked + .toggle-track { background: #2F4858; }
+    .toggle-thumb {
+        position: absolute;
+        top: 3px; left: 3px;
+        width: 18px; height: 18px;
+        background: white;
+        border-radius: 50%;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        transition: transform 0.3s;
+    }
+    .toggle-switch input:checked + .toggle-track .toggle-thumb { transform: translateX(20px); }
+    .toggle-text {
+        font-size: 14px;
+        color: #555;
+        font-weight: 500;
+    }
+
+    /* Category chips row */
+    .cat-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        flex: 1;
+    }
+    .cat-chip {
+        padding: 7px 16px;
+        border-radius: 20px;
+        border: 1.5px solid #e0e0e0;
+        background: white;
+        color: #555;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 500;
+    }
+    .cat-chip:hover { border-color: #2F4858; color: #2F4858; }
+    .cat-chip.active { background: #2F4858; color: white; border-color: #2F4858; }
+
+    /* Active filter tags */
+    .active-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        flex: 1;
+    }
+    .active-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        background: #eef2f5;
+        border-radius: 20px;
+        font-size: 13px;
+        color: #444;
+        font-weight: 500;
+    }
+    .active-tag button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #999;
+        font-size: 15px;
+        line-height: 1;
+        padding: 0 2px;
+        transition: color 0.2s;
+    }
+    .active-tag button:hover { color: #c0392b; }
+
+    /* Action buttons */
+    .action-btns { display: flex; gap: 10px; }
+
+    .btn-apply {
+        padding: 11px 28px;
+        background: #2F4858;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.25s, transform 0.2s;
+        display: flex; align-items: center;
+    }
+    .btn-apply:hover { background: #3e5e73; transform: translateY(-1px); }
+
+    .btn-reset {
+        padding: 11px 22px;
+        background: #f3f3f3;
+        color: #666;
+        border: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.25s;
+        display: flex; align-items: center;
+    }
+    .btn-reset:hover { background: #e8e8e8; }
+
+    /* ── Responsive ── */
     @@media (max-width: 992px) {
-        .features-grid {
-            grid-template-columns: 1fr 1fr;
-        }
-        
+        .features-grid { grid-template-columns: 1fr 1fr; }
         .spotlight-grid {
             grid-template-columns: 1fr;
             grid-template-rows: repeat(3, 300px);
         }
-        
-        .spotlight-item.male {
-            grid-row: span 1;
-        }
+        .spotlight-item.male { grid-row: span 1; }
+        .filter-row-top { flex-direction: column; gap: 16px; }
+        .filter-search, .filter-price, .filter-sort, .filter-stock { min-width: unset; width: 100%; }
+        .filter-row-actions { flex-direction: column; align-items: flex-start; gap: 14px; }
     }
 
     @@media (max-width: 576px) {
-        .features-grid {
-            grid-template-columns: 1fr;
-        }
-        
-        .section-title h2 {
-            font-size: 24px;
-        }
+        .features-grid { grid-template-columns: 1fr; }
+        .section-title h2 { font-size: 24px; }
+        .home-filter-panel { padding: 20px 16px; }
+        .sort-pills { flex-direction: column; }
+        .action-btns { width: 100%; flex-direction: column; }
+        .btn-apply, .btn-reset { width: 100%; justify-content: center; }
     }
 </style>
-

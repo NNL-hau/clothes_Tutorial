@@ -121,9 +121,12 @@
                         <span>Xin chào,</span>
                         <strong>Quản trị viên</strong>
                     </div>
-                    <div style="width: 40px; height: 40px; border-radius: 10px; background: #e2e8f0; display: flex; align-items: center; justify-content: center;">
-                        <i class="fa-solid fa-user-tie" style="color: #1a73e8; font-size: 1.2rem;"></i>
+                    <div class="profile-avatar">
+                        <i class="fa-solid fa-user-tie"></i>
                     </div>
+                    <button class="logout-btn-admin" @onclick="HandleLogout" title="Đăng xuất">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
                 </div>
             </div>
         </header>
@@ -138,6 +141,7 @@
 @inject IOrderApiService OrderService
 @inject IReviewApiService ReviewService
 @inject IProductApiService ProductService
+@inject IAuthService AuthService
 @using ClothesShop.Web.Models
 
 @code {
@@ -210,6 +214,12 @@
     public record DashboardNote(string Title, string Description, string Type, string Icon, bool IsNew = false)
     {
         public bool IsNew { get; set; } = IsNew;
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/login");
     }
 
     public void Dispose() { }
@@ -309,5 +319,38 @@
     .note-content { flex: 1; }
     .note-title { font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-bottom: 0.1rem; }
     .note-desc { font-size: 0.75rem; color: #64748b; line-height: 1.4; }
+
+    .profile-avatar {
+        width: 40px; 
+        height: 40px; 
+        border-radius: 10px; 
+        background: #e2e8f0; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center;
+        color: #1a73e8;
+        font-size: 1.2rem;
+    }
+
+    .logout-btn-admin {
+        background: #fee2e2;
+        color: #ef4444;
+        border: none;
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-left: 8px;
+    }
+
+    .logout-btn-admin:hover {
+        background: #ef4444;
+        color: white;
+        transform: scale(1.05);
+    }
 </style>
 

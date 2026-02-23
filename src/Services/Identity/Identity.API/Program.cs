@@ -95,33 +95,45 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Ensure database is created
+// Ensure database is created and seed default admin
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-    
     // Simple retry logic for DB connectivity in Docker
     int retries = 5;
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     while (retries > 0)
     {
         try 
         {
             context.Database.EnsureCreated();
 
-            // Seed Admin User
-            if (!context.Users.Any(u => u.Role == "Admin"))
+            // Ensure default admin account exists with correct credentials
+            var existingAdmin = context.Users.FirstOrDefault(u => u.FullName == "admin" || u.Role == "Admin");
+            if (existingAdmin == null)
             {
-                var adminUser = new Identity.API.Models.User
+                // No admin at all → create one
+                context.Users.Add(new Identity.API.Models.User
                 {
-                    Email = "admin@clothesshop.com",
-                    FullName = "Admin",
+                    Id = Guid.NewGuid(),
+                    FullName = "admin",
+                    Email = "admin@canifas.com",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"),
                     Role = "Admin",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("AdminPassword123!"),
                     CreatedAt = DateTime.UtcNow
-                };
-                context.Users.Add(adminUser);
+                });
                 context.SaveChanges();
-                Console.WriteLine("[Identity.API] Seeded admin user: admin@clothesshop.com / AdminPassword123!");
+                logger.LogInformation("Default admin created: username='admin', password='Admin@123'");
+            }
+            else
+            {
+                // Always reset admin credentials to ensure correct password
+                existingAdmin.FullName = "admin";
+                existingAdmin.Email = "admin@canifas.com";
+                existingAdmin.PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123");
+                existingAdmin.Role = "Admin";
+                context.SaveChanges();
+                logger.LogInformation("Admin credentials reset: username='admin', password='Admin@123'");
             }
 
             break;
@@ -131,11 +143,10 @@ using (var scope = app.Services.CreateScope())
             retries--;
             if (retries == 0)
             {
-                var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
                 logger.LogError(ex, "An error occurred creating the DB after multiple retries.");
                 throw;
             }
-            Console.WriteLine($"[Identity.API] Database not ready, retrying... ({5-retries}/5): {ex.Message}");
+            Console.WriteLine($"[Identity.API] Database not ready, retrying... ({5 - retries}/5): {ex.Message}");
             Thread.Sleep(5000);
         }
     }
