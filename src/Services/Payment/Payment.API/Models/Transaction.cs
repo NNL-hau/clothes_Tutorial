@@ -20,6 +20,9 @@ namespace Payment.API.Models
         [Required]
         public string Status { get; set; } = "Pending"; // Pending, Success, Failed
         
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = TimeZoneInfo.ConvertTimeFromUtc(
+            DateTime.UtcNow, 
+            TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time") // UTC+7 Vietnam
+        );
     }
 }

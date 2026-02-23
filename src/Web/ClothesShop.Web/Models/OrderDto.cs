@@ -6,6 +6,13 @@ namespace ClothesShop.Web.Models
         decimal TotalPrice,
         string OrderStatus,
         DateTime CreatedAt,
+        string? FullName,
+        string? PhoneNumber,
+        string? Province,
+        string? District,
+        string? Ward,
+        string? AddressDetail,
+        string? PaymentMethodName,
         List<OrderItemDto> OrderItems
     );
 

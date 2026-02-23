@@ -70,7 +70,8 @@
     private int DisplayCount { get; set; }
     private bool isLoading = true;
 
-    protected override async Task OnInitializedAsync()
+    // Không cần async/await ở đây, tránh warning CS1998
+    protected override void OnInitialized()
     {
         DisplayCount = InitialCount;
     }

@@ -264,13 +264,13 @@
                 }
                 else
                 {
-                    formError = "Lỗi khi lưu danh mục";
+                    formError = "Lỗi khi lưu danh mục (không nhận được phản hồi)";
                 }
             }
         }
         catch (Exception ex)
         {
-            formError = $"Lỗi: {ex.Message}";
+            formError = ex.Message;
         }
         finally
         {
@@ -318,4 +318,6 @@
             isDeleting = false;
         }
     }
+
+    protected override bool RequireAdminRole => true;
 }

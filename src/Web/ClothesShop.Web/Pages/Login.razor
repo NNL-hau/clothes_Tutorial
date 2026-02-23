@@ -281,7 +281,14 @@
             var result = await AuthService.GoogleLoginAsync(credential);
             if (result != null)
             {
-                Navigation.NavigateTo("/");
+                if (result.Role == "Admin")
+                {
+                    Navigation.NavigateTo("/admin");
+                }
+                else
+                {
+                    Navigation.NavigateTo("/");
+                }
             }
         }
         catch (Exception ex)
@@ -315,7 +322,14 @@
             var result = await AuthService.LoginAsync(loginModel);
             if (result != null)
             {
-                Navigation.NavigateTo("/");
+                if (result.Role == "Admin")
+                {
+                    Navigation.NavigateTo("/admin");
+                }
+                else
+                {
+                    Navigation.NavigateTo("/");
+                }
             }
         }
         catch (Exception ex)

@@ -43,11 +43,17 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IProductApiService, ProductApiService>();
 builder.Services.AddScoped<IBannerApiService, BannerApiService>();
 builder.Services.AddScoped<IOrderApiService, OrderApiService>();
+builder.Services.AddScoped<IEmailService, MockEmailService>();
 builder.Services.AddScoped<IUserApiService, UserApiService>();
 builder.Services.AddScoped<ICategoryApiService, CategoryApiService>();
 builder.Services.AddScoped<IReviewApiService, ReviewApiService>();
 builder.Services.AddScoped<IPaymentApiService, PaymentApiService>();
 builder.Services.AddScoped<IBasketService, BasketService>();
+builder.Services.AddScoped<IChatApiService, ChatApiService>(sp => 
+{
+    var client = sp.GetRequiredService<IHttpClientFactory>().CreateClient("CatalogApi");
+    return new ChatApiService(client);
+});
 
 var host = builder.Build();
 

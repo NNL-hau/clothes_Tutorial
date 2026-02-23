@@ -11,11 +11,16 @@ namespace Ordering.API.Models
         
         public decimal TotalPrice { get; set; }
         
-        // Billing Address
-        public string? FirstName { get; set; }
-        public string? LastName { get; set; }
+        // Detailed Customer Info
+        public string? FullName { get; set; }
+        public string? PhoneNumber { get; set; }
         public string? EmailAddress { get; set; }
-        public string? AddressLine { get; set; }
+        public string? Province { get; set; }
+        public string? District { get; set; }
+        public string? Ward { get; set; }
+        public string? AddressDetail { get; set; }
+
+        public string? AddressLine { get; set; } // Legacy field
         public string? Country { get; set; }
         public string? State { get; set; }
         public string? ZipCode { get; set; }
@@ -25,6 +30,7 @@ namespace Ordering.API.Models
         public string? CardNumber { get; set; }
         public string? Expiration { get; set; }
         public string? CVV { get; set; }
+        public string? PaymentMethodName { get; set; } // e.g., "COD", "MoMo"
         public int PaymentMethod { get; set; }
 
         [Required]

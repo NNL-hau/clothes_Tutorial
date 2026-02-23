@@ -8,6 +8,7 @@ namespace ClothesShop.Web.Services
     {
         Task<List<OrderDto>> GetOrdersAsync();
         Task<OrderDto?> GetOrderAsync(Guid id);
+        Task<OrderDto?> CreateOrderAsync(CreateOrderRequest request);
         Task<bool> UpdateOrderStatusAsync(Guid id, string status);
         Task<bool> DeleteOrderAsync(Guid id);
     }
@@ -44,6 +45,26 @@ namespace ClothesShop.Web.Services
             catch (Exception ex)
             {
                 Console.WriteLine($"Error fetching order {id}: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<OrderDto?> CreateOrderAsync(CreateOrderRequest request)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/orders", request);
+                if (response.IsSuccessStatusCode)
+                {
+                    return await response.Content.ReadFromJsonAsync<OrderDto>();
+                }
+                var error = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Error creating order: {response.StatusCode} - {error}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating order: {ex.Message}");
                 return null;
             }
         }

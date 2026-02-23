@@ -276,5 +276,7 @@
 
     public record Stat(string Label, string Value, string Trend, bool IsPositive, string Icon, string Class);
     public record DashboardNote(string Title, string Description, string Type, string Icon);
+
+    protected override bool RequireAdminRole => true;
 }
 

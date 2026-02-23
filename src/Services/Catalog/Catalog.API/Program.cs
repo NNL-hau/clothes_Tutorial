@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
+builder.Services.AddHttpClient();
 
 // Configure Database
 builder.Services.AddDbContext<CatalogDbContext>(options =>
@@ -39,15 +40,29 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
-    try
+    var context = services.GetRequiredService<CatalogDbContext>();
+    
+    // Simple retry logic for DB connectivity in Docker
+    int retries = 5;
+    while (retries > 0)
     {
-        var context = services.GetRequiredService<CatalogDbContext>();
-        context.Database.EnsureCreated();
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while creating the database.");
+        try 
+        {
+            context.Database.EnsureCreated();
+            break;
+        }
+        catch (Exception ex)
+        {
+            retries--;
+            if (retries == 0)
+            {
+                var logger = services.GetRequiredService<ILogger<Program>>();
+                logger.LogError(ex, "An error occurred while creating the database after multiple retries.");
+                throw;
+            }
+            Console.WriteLine($"[Catalog.API] Database not ready, retrying... ({5-retries}/5): {ex.Message}");
+            Thread.Sleep(5000);
+        }
     }
 }
 
@@ -58,7 +73,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 
 app.UseStaticFiles(); // Serve static files from wwwroot
 

@@ -1,0 +1,152 @@
+@using ClothesShop.Web.Services
+@inject IJSRuntime JS
+@inject IChatApiService ChatApiService
+@inject IAuthService authService
+
+@if (!isOpen)
+{
+    <div class="chat-floating-btn" @onclick="ToggleChat">
+        <i class='bx bx-message-square-dots'></i>
+    </div>
+}
+
+<div class="chat-container @(isOpen ? "" : "hidden")">
+    <div class="chat-header">
+        <h3>Trợ lý ClothesShop</h3>
+        <button class="chat-close-btn" @onclick="ToggleChat"><i class='bx bx-chevron-down'></i></button>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+        @if (messages.Count == 0)
+        {
+            <div class="welcome-screen">
+                <i class='bx bxs-bot welcome-icon'></i>
+                <h4 style="color: var(--chat-text)">Tôi có thể giúp gì cho bạn?</h4>
+                <p style="color: var(--chat-text-dim)">Trợ lý thời trang thông minh của bạn. Hãy hỏi tôi về bộ sưu tập, giá cả hoặc gợi ý phối đồ!</p>
+                
+                <div class="suggestions-grid">
+                    @foreach (var suggestion in suggestions)
+                    {
+                        <div class="suggestion-card" @onclick="() => UseSuggestion(suggestion.Text)">
+                            <p>@suggestion.Text</p>
+                            <i class='bx @suggestion.Icon'></i>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @foreach (var msg in messages)
+        {
+            <div class="message @(msg.IsUser ? "message-outgoing" : "message-incoming")">
+                <div class="message-avatar">
+                   <i class='bx @(msg.IsUser ? "bx-user" : "bxs-magic-wand")'></i>
+                </div>
+                <div class="message-content">
+                    @if (msg.IsUser)
+                    {
+                        @msg.Content
+                    }
+                    else
+                    {
+                        @((MarkupString)msg.HtmlContent)
+                    }
+                </div>
+            </div>
+        }
+
+        @if (isTyping)
+        {
+            <div class="message message-incoming">
+                <div class="message-avatar">
+                    <i class='bx bxs-magic-wand'></i>
+                </div>
+                <div class="message-content">
+                    <div class="loading-indicator">
+                        <div class="loading-bar" style="width: 100%"></div>
+                        <div class="loading-bar" style="width: 70%"></div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="chat-input-area">
+        <EditForm Model="@this" OnValidSubmit="SendMessage">
+            <div class="chat-input-wrapper">
+                <input type="text" @bind="userInput" placeholder="Bạn cần tìm gì?..." @bind:event="oninput" />
+                <button type="submit" class="chat-send-btn">
+                    <i class='bx bx-send'></i>
+                </button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private bool isOpen = false;
+    private string userInput = "";
+    private bool isTyping = false;
+    private List<ChatMessage> messages = new();
+
+    private void ToggleChat()
+    {
+        isOpen = !isOpen;
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(userInput) || isTyping) return;
+
+        var userMsg = userInput;
+        userInput = "";
+        messages.Add(new ChatMessage { Content = userMsg, IsUser = true });
+        
+        isTyping = true;
+        await ScrollToBottom();
+
+        var currentUser = await authService.GetCurrentUserAsync();
+        var response = await ChatApiService.GetChatResponse(userMsg, currentUser?.FullName);
+        
+        var htmlContent = await JS.InvokeAsync<string>("renderMarkdown", response);
+        
+        isTyping = false;
+        messages.Add(new ChatMessage { 
+            Content = response, 
+            HtmlContent = htmlContent,
+            IsUser = false 
+        });
+
+        await ScrollToBottom();
+        await JS.InvokeVoidAsync("highlightAll");
+    }
+
+    private async Task UseSuggestion(string text)
+    {
+        userInput = text;
+        await SendMessage();
+    }
+
+    private async Task ScrollToBottom()
+    {
+        StateHasChanged();
+        // Additional scrolling logic if needed
+    }
+
+    private List<Suggestion> suggestions = new()
+    {
+        new("Cho tôi xem áo sơ mi xanh", "bx-shirt"),
+        new("Hàng mới về mùa đông", "bx-cloud-snow"),
+        new("Xu hướng thời trang nam", "bx-trending-up"),
+        new("Cửa hàng có giảm giá không?", "bx-purchase-tag-alt")
+    };
+
+    public class ChatMessage
+    {
+        public string Content { get; set; } = "";
+        public string HtmlContent { get; set; } = "";
+        public bool IsUser { get; set; }
+    }
+
+    public record Suggestion(string Text, string Icon);
+}

@@ -40,11 +40,35 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    // Auto-migrate database on startup
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<ReviewDbContext>();
+        
+        // Simple retry logic for DB connectivity in Docker
+        int retries = 5;
+        while (retries > 0)
+        {
+            try 
+            {
+                db.Database.EnsureCreated();
+                break;
+            }
+            catch (Exception ex)
+            {
+                retries--;
+                if (retries == 0) throw;
+                Console.WriteLine($"[Review.API] Database not ready, retrying... ({5-retries}/5): {ex.Message}");
+                Thread.Sleep(5000);
+            }
+        }
+    }
 }
 
 app.UseCors("AllowBlazorWasm");
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 
 app.UseAuthorization();
 

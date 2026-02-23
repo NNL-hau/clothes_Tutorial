@@ -1,0 +1,659 @@
+@page "/checkout"
+@inherits AuthorizedPageBase
+@inject IBasketService BasketService
+@inject IAuthService AuthService
+@inject IPaymentApiService PaymentApiService
+@inject IOrderApiService OrderApiService
+@inject IEmailService EmailService
+@inject NavigationManager Navigation
+
+<div class="checkout-container">
+    <div class="checkout-header">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/cart">Giỏ hàng</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Thanh toán</li>
+                <li class="breadcrumb-item">Hoàn tất</li>
+            </ol>
+        </nav>
+        <h1 class="page-title">Thanh toán đơn hàng</h1>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-overlay">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Đang tải...</span>
+            </div>
+            <p>Đang chuẩn bị đơn hàng cho bạn...</p>
+        </div>
+    }
+    else if (basket == null || !basket.Items.Any())
+    {
+        <div class="empty-cart-state">
+            <i class="bi bi-cart-x"></i>
+            <p>Giỏ hàng của bạn đang trống.</p>
+            <a href="/" class="btn btn-primary">TIẾP TỤC MUA SẮM</a>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            <!-- Cột trái: Thông tin giao hàng & Thanh toán -->
+            <div class="col-lg-7">
+                <div class="checkout-section shadow-sm">
+                    <h2 class="section-title"><i class="bi bi-person-badge me-2"></i>Thông tin thực nhận</h2>
+                    
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger animate__animated animate__fadeIn">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>@errorMessage
+                        </div>
+                    }
+
+                    <div class="customer-form mt-4">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label">Họ và tên</label>
+                                <input type="text" class="form-control" placeholder="Nhập họ và tên" @bind="checkoutForm.FullName" autocomplete="name" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Số điện thoại</label>
+                                <input type="tel" class="form-control" placeholder="Nhập số điện thoại nhận hàng" @bind="checkoutForm.PhoneNumber" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" placeholder="Email" @bind="checkoutForm.Email" readonly />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Tỉnh / Thành phố</label>
+                                <select class="form-select" @bind="checkoutForm.Province">
+                                    <option value="">Chọn Tỉnh / Thành phố</option>
+                                    <option value="Hà Nội">Hà Nội</option>
+                                    <option value="Hồ Chí Minh">TP. Hồ Chí Minh</option>
+                                    <option value="Đà Nẵng">Đà Nẵng</option>
+                                    <option value="Hải Phòng">Hải Phòng</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Quận / Huyện</label>
+                                <select class="form-select" @bind="checkoutForm.District">
+                                    <option value="">Chọn Quận / Huyện</option>
+                                    @if (!string.IsNullOrEmpty(checkoutForm.Province))
+                                    {
+                                        <option value="Quận 1">Quận 1</option>
+                                        <option value="Quận Cầu Giấy">Quận Cầu Giấy</option>
+                                        <option value="Quận Hải Châu">Quận Hải Châu</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Phường / Xã</label>
+                                <select class="form-select" @bind="checkoutForm.Ward">
+                                    <option value="">Chọn Phường / Xã</option>
+                                    @if (!string.IsNullOrEmpty(checkoutForm.District))
+                                    {
+                                        <option value="Phường Bến Nghé">Phường Bến Nghé</option>
+                                        <option value="Phường Dịch Vọng">Phường Dịch Vọng</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Địa chỉ chi tiết</label>
+                                <textarea class="form-control" rows="2" placeholder="Nhập số nhà, tên đường..." @bind="checkoutForm.AddressDetail"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2 class="section-title mt-5"><i class="bi bi-credit-card me-2"></i>Phương thức thanh toán</h2>
+                    <div class="payment-selection mt-3">
+                        <div class="payment-option @(selectedMethod == "COD" ? "active" : "")" @onclick='() => SetPaymentMethod("COD")'>
+                            <div class="radio-indicator"></div>
+                            <div class="payment-info">
+                                <span class="payment-name">Thanh toán khi nhận hàng (COD)</span>
+                                <span class="payment-desc">Thanh toán bằng tiền mặt khi bạn nhận được hàng.</span>
+                            </div>
+                            <i class="bi bi-cash payment-icon"></i>
+                        </div>
+                        
+                        <div class="payment-option @(selectedMethod == "MoMo" ? "active" : "")" @onclick='() => SetPaymentMethod("MoMo")'>
+                            <div class="radio-indicator"></div>
+                            <div class="payment-info">
+                                <span class="payment-name">Ví MoMo</span>
+                                <span class="payment-desc">Thanh toán qua ứng dụng MoMo (Demo).</span>
+                            </div>
+                            <img src="https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png" class="payment-icon-img" alt="MoMo" />
+                        </div>
+
+                        <div class="payment-option @(selectedMethod == "VNPay" ? "active" : "")" @onclick='() => SetPaymentMethod("VNPay")'>
+                            <div class="radio-indicator"></div>
+                            <div class="payment-info">
+                                <span class="payment-name">VNPay</span>
+                                <span class="payment-desc">Thanh toán quét mã QR (Demo).</span>
+                            </div>
+                            <img src="https://vnpay.vn/wp-content/uploads/2020/07/Logo-VNPAY700x350.png" class="payment-icon-img" alt="VNPay" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cột phải: Tóm tắt đơn hàng -->
+            <div class="col-lg-5">
+                <div class="order-sidebar sticky-top" style="top: 20px;">
+                    <div class="coupon-box shadow-sm mb-4">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0"><i class="bi bi-ticket-perforated"></i></span>
+                            <input type="text" class="form-control border-start-0" placeholder="Chọn hoặc nhập mã ưu đãi" />
+                            <button class="btn btn-outline-secondary">Xác nhận</button>
+                        </div>
+                    </div>
+
+                    <div class="order-summary-card shadow-sm">
+                        <h3 class="summary-title">Tóm tắt đơn hàng</h3>
+                        
+                        <div class="basket-items-list">
+                            @foreach (var item in basket.Items)
+                            {
+                                <div class="basket-item-mini">
+                                    <div class="item-details">
+                                        <span class="item-name">@item.ProductName</span>
+                                        <span class="item-qty">Số lượng: @item.Quantity</span>
+                                    </div>
+                                    <div class="item-price">@((item.Price * item.Quantity).ToString("N0")) đ</div>
+                                </div>
+                            }
+                        </div>
+
+                        <hr />
+
+                        <div class="price-row">
+                            <span>Giá trị đơn hàng</span>
+                            <span>@basket.TotalPrice.ToString("N0") đ</span>
+                        </div>
+                        <div class="price-row">
+                            <span>Giảm giá trực tiếp</span>
+                            <span class="text-danger">-0 đ</span>
+                        </div>
+                        <div class="price-row">
+                            <span>Phí vận chuyển</span>
+                            <span class="text-success">Miễn phí</span>
+                        </div>
+                        
+                        <div class="total-row mt-3">
+                            <span>Tổng tiền thanh toán</span>
+                            <span class="total-amount">@basket.TotalPrice.ToString("N0") đ</span>
+                        </div>
+                        <p class="tax-note">(Đã bao gồm thuế VAT)</p>
+
+                        <button class="btn btn-checkout w-100 mt-4" @onclick="HandleCheckout" disabled="@isProcessing">
+                            @if (isProcessing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>ĐANG XỬ LÝ...</span>
+                            }
+                            else
+                            {
+                                <span>THANH TOÁN</span>
+                            }
+                        </button>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(successMessage))
+                    {
+                        <div class="alert alert-success mt-3 animate__animated animate__bounceIn">
+                            <i class="bi bi-check-circle-fill me-2"></i>@successMessage
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .checkout-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 40px 20px;
+        font-family: 'Inter', -apple-system, blinkmacsystemfont, 'Segoe UI', roboto, oxygen, ubuntu, cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    .page-title {
+        font-weight: 700;
+        font-size: 28px;
+        margin-bottom: 30px;
+        text-transform: uppercase;
+        color: #333;
+    }
+
+    .section-title {
+        font-weight: 600;
+        font-size: 18px;
+        margin-bottom: 20px;
+        color: #222;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+    }
+
+    .checkout-section {
+        background: #fff;
+        padding: 30px;
+        border-radius: 12px;
+    }
+
+    .form-label {
+        font-weight: 500;
+        font-size: 14px;
+        color: #666;
+    }
+
+    .form-control, .form-select {
+        border-radius: 8px;
+        padding: 10px 15px;
+        border: 1px solid #ddd;
+        transition: all 0.3s;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #333;
+        box-shadow: 0 0 0 2px rgba(0,0,0,0.05);
+    }
+
+    /* Payment Selection Styles */
+    .payment-option {
+        display: flex;
+        align-items: center;
+        padding: 15px;
+        border: 1px solid #eee;
+        border-radius: 10px;
+        margin-bottom: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .payment-option:hover {
+        background: #f9f9f9;
+        border-color: #ddd;
+    }
+
+    .payment-option.active {
+        border-color: #333;
+        background: #fdfdfd;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .radio-indicator {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 2px solid #ddd;
+        margin-right: 15px;
+        position: relative;
+    }
+
+    .payment-option.active .radio-indicator {
+        border-color: #333;
+    }
+
+    .payment-option.active .radio-indicator::after {
+        content: '';
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background: #333;
+        border-radius: 50%;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+
+    .payment-info {
+        flex-grow: 1;
+    }
+
+    .payment-name {
+        display: block;
+        font-weight: 600;
+        font-size: 15px;
+    }
+
+    .payment-desc {
+        display: block;
+        font-size: 12px;
+        color: #888;
+    }
+
+    .payment-icon {
+        font-size: 24px;
+        color: #333;
+    }
+
+    .payment-icon-img {
+        height: 24px;
+        width: auto;
+    }
+
+    /* Sidebar Styles */
+    .order-summary-card {
+        background: #fff;
+        padding: 30px;
+        border-radius: 12px;
+    }
+
+    .summary-title {
+        font-weight: 700;
+        font-size: 20px;
+        margin-bottom: 20px;
+    }
+
+    .basket-item-mini {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        font-size: 14px;
+    }
+
+    .item-name {
+        display: block;
+        font-weight: 500;
+    }
+
+    .item-qty {
+        font-size: 12px;
+        color: #888;
+    }
+
+    .price-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        color: #666;
+        font-size: 15px;
+    }
+
+    .total-row {
+        display: flex;
+        justify-content: space-between;
+        font-weight: 700;
+        font-size: 18px;
+        color: #333;
+    }
+
+    .total-amount {
+        color: #d10000;
+        font-size: 24px;
+    }
+
+    .tax-note {
+        font-size: 12px;
+        color: #999;
+        text-align: right;
+    }
+
+    .btn-checkout {
+        background: #333;
+        color: #fff;
+        padding: 15px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        border-radius: 8px;
+        border: none;
+        transition: all 0.3s;
+    }
+
+    .btn-checkout:hover {
+        background: #000;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+
+    .btn-checkout:disabled {
+        background: #999;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .loading-overlay {
+        text-align: center;
+        padding: 100px 0;
+    }
+
+    .empty-cart-state {
+        text-align: center;
+        padding: 80px 0;
+        background: #fff;
+        border-radius: 12px;
+    }
+
+    .empty-cart-state i {
+        font-size: 64px;
+        color: #eee;
+        margin-bottom: 20px;
+        display: block;
+    }
+</style>
+
+@code {
+    private CustomerBasket? basket;
+    private bool isLoading = true;
+    private bool isProcessing = false;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+    private string selectedMethod = "COD";
+
+    private class CheckoutForm
+    {
+        public string FullName { get; set; } = string.Empty;
+        public string PhoneNumber { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Province { get; set; } = string.Empty;
+        public string District { get; set; } = string.Empty;
+        public string Ward { get; set; } = string.Empty;
+        public string AddressDetail { get; set; } = string.Empty;
+    }
+
+    private CheckoutForm checkoutForm = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        await LoadDataAsync();
+        await HandleVnPayCallbackAsync();
+    }
+
+    private async Task HandleVnPayCallbackAsync()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("vnp_ResponseCode", out var responseCode))
+        {
+            isProcessing = true;
+            isLoading = true;
+            StateHasChanged();
+
+            if (responseCode == "00")
+            {
+                if (query.TryGetValue("vnp_TxnRef", out var txnRefStr) && Guid.TryParse(txnRefStr, out var txnId))
+                {
+                    // DEMO MODE: Update transaction status without verification
+                    var statusUpdated = await PaymentApiService.UpdateTransactionStatusAsync(txnId, "Success");
+                    
+                    if (statusUpdated)
+                    {
+                        // Fetch transaction to get OrderId
+                        var transaction = await PaymentApiService.GetTransactionAsync(txnId);
+                        
+                        if (transaction != null)
+                        {
+                            successMessage = "Thanh toán VNPay thành công!";
+                            
+                            // Xóa giỏ hàng và gửi email khi quay về từ VNPay thành công
+                            await BasketService.ClearBasketAsync();
+                            await EmailService.SendOrderConfirmationEmailAsync(checkoutForm.Email, checkoutForm.FullName, transaction.OrderId.ToString(), transaction.Amount);
+                            
+                            await Task.Delay(2000);
+                            Navigation.NavigateTo($"/success/{transaction.OrderId}");
+                        }
+                        else
+                        {
+                            errorMessage = "Không tìm thấy thông tin giao dịch.";
+                        }
+                    }
+                    else
+                    {
+                        errorMessage = "Không thể cập nhật trạng thái giao dịch.";
+                    }
+                }
+            }
+            else
+            {
+                // Payment failed - update status to Failed
+                if (query.TryGetValue("vnp_TxnRef", out var txnRefStr) && Guid.TryParse(txnRefStr, out var txnId))
+                {
+                    await PaymentApiService.UpdateTransactionStatusAsync(txnId, "Failed");
+                }
+                errorMessage = $"Thanh toán VNPay thất bại. Mã lỗi: {responseCode}";
+            }
+
+            isProcessing = false;
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadDataAsync()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+
+        basket = await BasketService.GetBasketAsync();
+        
+        var user = AuthService.CurrentUser;
+        if (user != null)
+        {
+            checkoutForm.FullName = user.FullName;
+            checkoutForm.Email = user.Email;
+            checkoutForm.PhoneNumber = user.PhoneNumber ?? "";
+            checkoutForm.AddressDetail = user.Address ?? "";
+        }
+
+        isLoading = false;
+    }
+
+    private void SetPaymentMethod(string method)
+    {
+        selectedMethod = method;
+    }
+
+    private async Task HandleCheckout()
+    {
+        if (basket == null || !basket.Items.Any())
+        {
+            errorMessage = "Giỏ hàng trống.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(checkoutForm.FullName) || string.IsNullOrWhiteSpace(checkoutForm.PhoneNumber))
+        {
+            errorMessage = "Vui lòng điền đầy đủ Họ tên và Số điện thoại.";
+            return;
+        }
+
+        isProcessing = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            // 1. Tạo Đơn hàng (Order)
+            var orderRequest = new CreateOrderRequest(
+                UserName: checkoutForm.Email,
+                TotalPrice: basket.TotalPrice,
+                FullName: checkoutForm.FullName, 
+                PhoneNumber: checkoutForm.PhoneNumber,
+                EmailAddress: checkoutForm.Email,
+                Province: checkoutForm.Province,
+                District: checkoutForm.District,
+                Ward: checkoutForm.Ward,
+                AddressDetail: checkoutForm.AddressDetail,
+                AddressLine: $"{checkoutForm.AddressDetail}, {checkoutForm.Ward}, {checkoutForm.District}, {checkoutForm.Province}",
+                Country: "Vietnam",
+                State: "",
+                ZipCode: "",
+                CardName: "",
+                CardNumber: "",
+                Expiration: "",
+                CVV: "",
+                PaymentMethodName: selectedMethod,
+                PaymentMethod: selectedMethod == "COD" ? 1 : (selectedMethod == "MoMo" ? 2 : 3),
+                OrderItems: basket.Items.Select(i => new CreateOrderItemRequest(
+                    ProductId: i.ProductId,
+                    ProductName: i.ProductName,
+                    Price: i.Price,
+                    Quantity: i.Quantity
+                )).ToList()
+            );
+
+            var createdOrder = await OrderApiService.CreateOrderAsync(orderRequest);
+            if (createdOrder == null)
+            {
+                errorMessage = "Không thể tạo đơn hàng. Server Ordering API không phản hồi hoặc trả về lỗi.";
+                return;
+            }
+
+            // 2. Tạo giao dịch thanh toán
+            var transactionRequest = new CreateTransactionRequest(
+                OrderId: createdOrder.Id,
+                UserName: checkoutForm.Email,
+                Amount: basket.TotalPrice,
+                PaymentMethod: selectedMethod,
+                FullName: checkoutForm.FullName,
+                Email: checkoutForm.Email,
+                PhoneNumber: checkoutForm.PhoneNumber
+            );
+
+            var transaction = await PaymentApiService.CreateTransactionAsync(transactionRequest);
+
+            if (transaction == null)
+            {
+                Console.WriteLine("[Checkout] Transaction creation returned null.");
+                // Vẫn ghi nhận đơn hàng nhưng báo lỗi thanh toán
+                await BasketService.ClearBasketAsync();
+                successMessage = $"Đơn hàng đã được tạo (Mã: {createdOrder.Id.ToString().Substring(0, 8)}), nhưng gặp sự cố khi tạo giao dịch thanh toán. Chúng tôi sẽ liên hệ bạn sớm!";
+                return;
+            }
+
+            Console.WriteLine($"[Checkout] Transaction created. Method: {transaction.PaymentMethod}, Status: {transaction.Status}, PaymentUrl: {transaction.PaymentUrl ?? "NULL"}");
+
+            if (!string.IsNullOrEmpty(transaction.PaymentUrl) && selectedMethod == "VNPay")
+            {
+                Console.WriteLine($"[Checkout] Redirecting to: {transaction.PaymentUrl}");
+                // KHÔNG xóa giỏ hàng ở đây vì khách chưa thanh toán xong
+                // Redirect to VNPay Gateway
+                Navigation.NavigateTo(transaction.PaymentUrl, forceLoad: true);
+                return;
+            }
+            
+            // Nếu là COD hoặc các phương thức khác không cần Redirect duyệt ngay
+            await BasketService.ClearBasketAsync();
+            await EmailService.SendOrderConfirmationEmailAsync(checkoutForm.Email, checkoutForm.FullName, createdOrder.Id.ToString(), basket.TotalPrice);
+
+            Console.WriteLine("[Checkout] Redirecting to success page.");
+            Navigation.NavigateTo($"/success/{createdOrder.Id}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi hệ thống: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private void GoHome() => Navigation.NavigateTo("/");
+}
+
+
+

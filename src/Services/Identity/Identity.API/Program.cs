@@ -99,14 +99,45 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-    try 
+    
+    // Simple retry logic for DB connectivity in Docker
+    int retries = 5;
+    while (retries > 0)
     {
-        context.Database.EnsureCreated();
-    }
-    catch (Exception ex)
-    {
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred creating the DB.");
+        try 
+        {
+            context.Database.EnsureCreated();
+
+            // Seed Admin User
+            if (!context.Users.Any(u => u.Role == "Admin"))
+            {
+                var adminUser = new Identity.API.Models.User
+                {
+                    Email = "admin@clothesshop.com",
+                    FullName = "Admin",
+                    Role = "Admin",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("AdminPassword123!"),
+                    CreatedAt = DateTime.UtcNow
+                };
+                context.Users.Add(adminUser);
+                context.SaveChanges();
+                Console.WriteLine("[Identity.API] Seeded admin user: admin@clothesshop.com / AdminPassword123!");
+            }
+
+            break;
+        }
+        catch (Exception ex)
+        {
+            retries--;
+            if (retries == 0)
+            {
+                var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+                logger.LogError(ex, "An error occurred creating the DB after multiple retries.");
+                throw;
+            }
+            Console.WriteLine($"[Identity.API] Database not ready, retrying... ({5-retries}/5): {ex.Message}");
+            Thread.Sleep(5000);
+        }
     }
 }
 

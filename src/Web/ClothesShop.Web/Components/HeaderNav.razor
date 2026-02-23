@@ -47,6 +47,13 @@
                                 <i class="fa-solid fa-user-gear me-2"></i>
                                 <span>Thông tin tài khoản</span>
                             </a>
+                            @if (currentUser.Role == "Admin")
+                            {
+                                <NavLink class="dropdown-item" href="/admin" style="display: flex !important; width: 100% !important;">
+                                    <i class="fa-solid fa-gauge me-2"></i>
+                                    <span>Trang quản trị</span>
+                                </NavLink>
+                            }
                             <button class="dropdown-item logout-btn" @onclick="HandleLogout" style="display: flex !important; width: 100% !important;">
                                 <i class="fa-solid fa-right-from-bracket me-2"></i>
                                 <span>Đăng xuất</span>
@@ -63,14 +70,17 @@
                 </a>
             }
             
-            <a href="/cart" class="cart-link">
-                <i class="fa-solid fa-cart-shopping"></i>
-                <span>Giỏ hàng</span>
-                @if (cartCount > 0)
-                {
-                    <span class="cart-badge">@cartCount</span>
-                }
-            </a>
+            @if (currentUser?.Role != "Admin")
+            {
+                <a href="/cart" class="cart-link">
+                    <i class="fa-solid fa-cart-shopping"></i>
+                    <span>Giỏ hàng</span>
+                    @if (cartCount > 0)
+                    {
+                        <span class="cart-badge">@cartCount</span>
+                    }
+                </a>
+            }
         </div>
     </div>
 </header>

@@ -37,17 +37,15 @@ namespace ClothesShop.Web.Services
 
         public async Task<CategoryDto?> CreateCategoryAsync(CreateCategoryDto dto)
         {
-            try
+            var response = await _httpClient.PostAsJsonAsync("api/categories", dto);
+            
+            if (response.IsSuccessStatusCode)
             {
-                var response = await _httpClient.PostAsJsonAsync("api/categories", dto);
-                response.EnsureSuccessStatusCode();
                 return await response.Content.ReadFromJsonAsync<CategoryDto>();
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error creating category: {ex.Message}");
-                return null;
-            }
+            
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new Exception($"API Error ({response.StatusCode}): {errorContent}");
         }
 
         public async Task<bool> UpdateCategoryAsync(Guid id, CreateCategoryDto dto)
