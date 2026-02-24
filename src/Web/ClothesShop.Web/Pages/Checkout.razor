@@ -157,6 +157,16 @@
                                 <div class="basket-item-mini">
                                     <div class="item-details">
                                         <span class="item-name">@item.ProductName</span>
+                                        <div class="item-meta-mini">
+                                            @if (!string.IsNullOrEmpty(item.SelectedColor))
+                                            {
+                                                <span class="badge bg-light text-dark border me-1">@item.SelectedColor</span>
+                                            }
+                                            @if (!string.IsNullOrEmpty(item.SelectedSize))
+                                            {
+                                                <span class="badge bg-light text-dark border">@item.SelectedSize</span>
+                                            }
+                                        </div>
                                         <span class="item-qty">Số lượng: @item.Quantity</span>
                                     </div>
                                     <div class="item-price">@((item.Price * item.Quantity).ToString("N0")) đ</div>
@@ -425,11 +435,14 @@
         border-radius: 12px;
     }
 
-    .empty-cart-state i {
-        font-size: 64px;
-        color: #eee;
-        margin-bottom: 20px;
-        display: block;
+    .item-meta-mini {
+        margin-bottom: 4px;
+    }
+
+    .item-meta-mini .badge {
+        font-weight: 400;
+        font-size: 11px;
+        padding: 4px 8px;
     }
 </style>
 
@@ -587,12 +600,21 @@
                 CVV: "",
                 PaymentMethodName: selectedMethod,
                 PaymentMethod: selectedMethod == "COD" ? 1 : (selectedMethod == "MoMo" ? 2 : 3),
-                OrderItems: basket.Items.Select(i => new CreateOrderItemRequest(
-                    ProductId: i.ProductId,
-                    ProductName: i.ProductName,
-                    Price: i.Price,
-                    Quantity: i.Quantity
-                )).ToList()
+                OrderItems: basket.Items.Select(i => {
+                    var nameWithDetails = i.ProductName;
+                    if (!string.IsNullOrEmpty(i.SelectedColor) || !string.IsNullOrEmpty(i.SelectedSize))
+                    {
+                        var details = string.Join(", ", new[] { i.SelectedColor, i.SelectedSize }.Where(s => !string.IsNullOrEmpty(s)));
+                        nameWithDetails = $"{i.ProductName} ({details})";
+                    }
+                    
+                    return new CreateOrderItemRequest(
+                        ProductId: i.ProductId,
+                        ProductName: nameWithDetails,
+                        Price: i.Price,
+                        Quantity: i.Quantity
+                    );
+                }).ToList()
             );
 
             var createdOrder = await OrderApiService.CreateOrderAsync(orderRequest);

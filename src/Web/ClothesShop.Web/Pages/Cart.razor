@@ -43,6 +43,26 @@
                             <img src="@(string.IsNullOrEmpty(item.ImageUrl) ? "/images/placeholder-product.jpg" : item.ImageUrl)" alt="@item.ProductName" />
                             <div class="item-details">
                                 <span class="item-name">@item.ProductName</span>
+                                <div class="item-options">
+                                    <div class="option-select">
+                                        <label>Màu:</label>
+                                        <select @onchange="@(e => UpdateOptions(item, e.Value?.ToString(), item.SelectedSize))">
+                                            @foreach (var color in (item.AvailableColors ?? "").Split(',').Select(c => c.Trim()).Where(c => !string.IsNullOrEmpty(c)))
+                                            {
+                                                <option value="@color" selected="@(color == item.SelectedColor)">@color</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="option-select">
+                                        <label>Size:</label>
+                                        <select @onchange="@(e => UpdateOptions(item, item.SelectedColor, e.Value?.ToString()))">
+                                            @foreach (var size in (item.AvailableSizes ?? "").Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)))
+                                            {
+                                                <option value="@size" selected="@(size == item.SelectedSize)">@size</option>
+                                            }
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -82,30 +102,86 @@
                 <button class="btn-continue" @onclick="GoHome">TIẾP TỤC MUA HÀNG</button>
             </div>
         </div>
+
+        @if (relatedProducts != null && relatedProducts.Any())
+        {
+            <div class="related-products-section">
+                <h2>CÓ THỂ BẠN SẼ THÍCH</h2>
+                <div class="related-products-grid">
+                    @foreach (var product in relatedProducts)
+                    {
+                        <div class="related-product-card" @onclick="() => NavigateToProduct(product.Id)">
+                            <img src="@(string.IsNullOrEmpty(product.ImageUrl) ? "/images/placeholder-product.jpg" : product.ImageUrl)" alt="@product.Name" />
+                            <div class="related-product-info">
+                                <span class="p-name">@product.Name</span>
+                                <span class="p-price">@product.Price.ToString("N0") đ</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
     }
 </div>
 
 @code {
     private CustomerBasket? basket;
+    private List<ProductDto>? relatedProducts;
     private bool isLoading = true;
+
+    [Inject] private IProductApiService ProductApiService { get; set; } = null!;
 
     protected override async Task OnInitializedAsync()
     {
         BasketService.OnChange += HandleBasketChange;
         await LoadBasket();
+        await LoadRelatedProducts();
     }
 
     private async Task LoadBasket()
     {
         isLoading = true;
         basket = await BasketService.GetBasketAsync();
+        
+        // Fix for items with missing AvailableColors/Sizes (old items)
+        if (basket != null && basket.Items.Any(i => string.IsNullOrEmpty(i.AvailableColors)))
+        {
+            foreach (var item in basket.Items.Where(i => string.IsNullOrEmpty(i.AvailableColors)))
+            {
+                var product = await ProductApiService.GetProductAsync(item.ProductId);
+                if (product != null)
+                {
+                    item.AvailableColors = product.Colors;
+                    item.AvailableSizes = product.Sizes;
+                    
+                    var colors = product.Colors?.Split(',').Select(c => c.Trim()).ToList();
+                    var sizes = product.Sizes?.Split(',').Select(s => s.Trim()).ToList();
+                    
+                    if (string.IsNullOrEmpty(item.SelectedColor))
+                        item.SelectedColor = colors?.FirstOrDefault();
+                    if (string.IsNullOrEmpty(item.SelectedSize))
+                        item.SelectedSize = sizes?.FirstOrDefault();
+                }
+            }
+        }
+
         isLoading = false;
         StateHasChanged();
+    }
+
+    private async Task LoadRelatedProducts()
+    {
+        if (basket?.Items.Any() == true)
+        {
+            var firstProductId = basket.Items.First().ProductId;
+            relatedProducts = await ProductApiService.GetRelatedProductsAsync(firstProductId);
+        }
     }
 
     private async void HandleBasketChange()
     {
         await LoadBasket();
+        await LoadRelatedProducts();
     }
 
     private async Task UpdateQuantity(BasketItem item, int change)
@@ -113,8 +189,13 @@
         var newQuantity = item.Quantity + change;
         if (newQuantity >= 0)
         {
-            await BasketService.UpdateQuantityAsync(item.ProductId, newQuantity);
+            await BasketService.UpdateQuantityAsync(item.ProductId, item.SelectedColor, item.SelectedSize, newQuantity);
         }
+    }
+
+    private async Task UpdateOptions(BasketItem item, string? newColor, string? newSize)
+    {
+        await BasketService.UpdateOptionsAsync(item.ProductId, item.SelectedColor, item.SelectedSize, newColor, newSize);
     }
 
     private async Task RemoveItem(Guid productId)
@@ -124,6 +205,7 @@
 
     private void GoHome() => Navigation.NavigateTo("/");
     private void GoToCheckout() => Navigation.NavigateTo("/checkout");
+    private void NavigateToProduct(Guid id) => Navigation.NavigateTo($"/product/{id}");
 
     public void Dispose()
     {

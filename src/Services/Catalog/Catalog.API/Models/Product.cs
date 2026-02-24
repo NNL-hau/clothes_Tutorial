@@ -23,6 +23,9 @@ namespace Catalog.API.Models
         
         public int StockQuantity { get; set; }
         
+        public string? Colors { get; set; } // e.g., "Đen, Trắng, Xanh"
+        public string? Sizes { get; set; }  // e.g., "S, M, L, XL"
+        
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

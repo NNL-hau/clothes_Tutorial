@@ -49,6 +49,19 @@ using (var scope = app.Services.CreateScope())
         try 
         {
             context.Database.EnsureCreated();
+            
+            // Seed Colors and Sizes for existing products if they are empty
+            var products = context.Products.Where(p => string.IsNullOrEmpty(p.Colors) || string.IsNullOrEmpty(p.Sizes)).ToList();
+            if (products.Any())
+            {
+                foreach (var p in products)
+                {
+                    p.Colors = "Đen, Trắng, Xanh, Đỏ";
+                    p.Sizes = "S, M, L, XL, XXL";
+                }
+                context.SaveChanges();
+            }
+            
             break;
         }
         catch (Exception ex)

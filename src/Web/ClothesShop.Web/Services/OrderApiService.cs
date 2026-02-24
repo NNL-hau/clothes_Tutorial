@@ -16,16 +16,29 @@ namespace ClothesShop.Web.Services
     public class OrderApiService : IOrderApiService
     {
         private readonly HttpClient _httpClient;
+        private readonly IAuthService _authService;
 
-        public OrderApiService(IHttpClientFactory httpClientFactory)
+        public OrderApiService(IHttpClientFactory httpClientFactory, IAuthService authService)
         {
             _httpClient = httpClientFactory.CreateClient("OrderingApi");
+            _authService = authService;
+        }
+
+        private async Task AddAuthHeaderAsync()
+        {
+            var token = await _authService.GetTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = 
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
         }
 
         public async Task<List<OrderDto>> GetOrdersAsync()
         {
             try
             {
+                await AddAuthHeaderAsync();
                 var orders = await _httpClient.GetFromJsonAsync<List<OrderDto>>("api/orders");
                 return orders ?? new List<OrderDto>();
             }
@@ -40,6 +53,7 @@ namespace ClothesShop.Web.Services
         {
             try
             {
+                await AddAuthHeaderAsync();
                 return await _httpClient.GetFromJsonAsync<OrderDto>($"api/orders/{id}");
             }
             catch (Exception ex)
@@ -53,6 +67,7 @@ namespace ClothesShop.Web.Services
         {
             try
             {
+                await AddAuthHeaderAsync();
                 var response = await _httpClient.PostAsJsonAsync("api/orders", request);
                 if (response.IsSuccessStatusCode)
                 {
@@ -73,6 +88,7 @@ namespace ClothesShop.Web.Services
         {
             try
             {
+                await AddAuthHeaderAsync();
                 var dto = new UpdateOrderStatusDto(status);
                 var response = await _httpClient.PatchAsJsonAsync($"api/orders/{id}/status", dto);
                 return response.IsSuccessStatusCode;
@@ -88,6 +104,7 @@ namespace ClothesShop.Web.Services
         {
             try
             {
+                await AddAuthHeaderAsync();
                 var response = await _httpClient.DeleteAsync($"api/orders/{id}");
                 return response.IsSuccessStatusCode;
             }

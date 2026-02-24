@@ -2,6 +2,7 @@
 @using ClothesShop.Web.Services
 @inject IBasketService BasketService
 @inject IAuthService AuthService
+@inject NavigationManager Navigation
 
 <div class="product-card">
     <div class="product-image" @onclick="OpenDetail">
@@ -107,8 +108,7 @@
 
     private void OpenDetail()
     {
-        errorMessage = null;
-        showDetail = true;
+        Navigation.NavigateTo($"/product/{Product.Id}");
     }
     private void CloseDetail() => showDetail = false;
 

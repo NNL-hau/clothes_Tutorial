@@ -45,7 +45,17 @@ namespace ClothesShop.Web.Services
                 return;
 
             var basket = await GetBasketAsync();
-            var item = basket.Items.FirstOrDefault(i => i.ProductId == product.Id);
+            
+            var colors = product.Colors?.Split(',').Select(c => c.Trim()).ToList();
+            var sizes = product.Sizes?.Split(',').Select(s => s.Trim()).ToList();
+            
+            var defaultColor = colors?.FirstOrDefault();
+            var defaultSize = sizes?.FirstOrDefault();
+
+            // Try to find item with same product ID AND default selected options
+            var item = basket.Items.FirstOrDefault(i => i.ProductId == product.Id && 
+                                                      (i.SelectedColor == defaultColor || (i.SelectedColor == null && defaultColor == null)) && 
+                                                      (i.SelectedSize == defaultSize || (i.SelectedSize == null && defaultSize == null)));
 
             if (item == null)
             {
@@ -56,12 +66,19 @@ namespace ClothesShop.Web.Services
                     Price = product.Price,
                     ImageUrl = product.ImageUrl,
                     Quantity = 1,
-                    StockQuantity = product.StockQuantity
+                    StockQuantity = product.StockQuantity,
+                    AvailableColors = product.Colors,
+                    AvailableSizes = product.Sizes,
+                    SelectedColor = defaultColor,
+                    SelectedSize = defaultSize
                 });
             }
             else
             {
                 item.Quantity++;
+                // Ensure metadata is updated even if item already existed
+                item.AvailableColors = product.Colors;
+                item.AvailableSizes = product.Sizes;
             }
 
             var key = GetBasketKey();
@@ -71,16 +88,13 @@ namespace ClothesShop.Web.Services
 
         public async Task RemoveFromBasketAsync(Guid productId)
         {
+            // Remove all items with this product ID
             var basket = await GetBasketAsync();
-            var item = basket.Items.FirstOrDefault(i => i.ProductId == productId);
-
-            if (item != null)
-            {
-                basket.Items.Remove(item);
-                var key = GetBasketKey();
-                await _localStorage.SetItemAsync(key, basket);
-                NotifyStateChanged();
-            }
+            basket.Items.RemoveAll(i => i.ProductId == productId);
+            
+            var key = GetBasketKey();
+            await _localStorage.SetItemAsync(key, basket);
+            NotifyStateChanged();
         }
 
         public async Task ClearBasketAsync()
@@ -99,10 +113,10 @@ namespace ClothesShop.Web.Services
             return basket.TotalItems;
         }
 
-        public async Task UpdateQuantityAsync(Guid productId, int quantity)
+        public async Task UpdateQuantityAsync(Guid productId, string? color, string? size, int quantity)
         {
             var basket = await GetBasketAsync();
-            var item = basket.Items.FirstOrDefault(i => i.ProductId == productId);
+            var item = basket.Items.FirstOrDefault(i => i.ProductId == productId && i.SelectedColor == color && i.SelectedSize == size);
 
             if (item != null)
             {
@@ -113,6 +127,34 @@ namespace ClothesShop.Web.Services
                 else
                 {
                     item.Quantity = quantity;
+                }
+
+                var key = GetBasketKey();
+                await _localStorage.SetItemAsync(key, basket);
+                NotifyStateChanged();
+            }
+        }
+
+        public async Task UpdateOptionsAsync(Guid productId, string? oldColor, string? oldSize, string? newColor, string? newSize)
+        {
+            var basket = await GetBasketAsync();
+            var item = basket.Items.FirstOrDefault(i => i.ProductId == productId && i.SelectedColor == oldColor && i.SelectedSize == oldSize);
+
+            if (item != null)
+            {
+                // Check if an item with the new options already exists
+                var existingItem = basket.Items.FirstOrDefault(i => i.ProductId == productId && i.SelectedColor == newColor && i.SelectedSize == newSize);
+                
+                if (existingItem != null && existingItem != item)
+                {
+                    // Merge quantities
+                    existingItem.Quantity += item.Quantity;
+                    basket.Items.Remove(item);
+                }
+                else
+                {
+                    item.SelectedColor = newColor;
+                    item.SelectedSize = newSize;
                 }
 
                 var key = GetBasketKey();

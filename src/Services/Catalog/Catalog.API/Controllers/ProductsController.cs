@@ -21,7 +21,7 @@ namespace Catalog.API.Controllers
         public async Task<ActionResult<IEnumerable<ProductDto>>> GetProducts()
         {
             return await _context.Products
-                .Select(p => new ProductDto(p.Id, p.Name, p.Description, p.Price, p.ImageUrl, p.CategoryId, p.StockQuantity, p.CreatedAt))
+                .Select(p => new ProductDto(p.Id, p.Name, p.Description, p.Price, p.ImageUrl, p.CategoryId, p.StockQuantity, p.Colors, p.Sizes, p.CreatedAt))
                 .ToListAsync();
         }
 
@@ -31,7 +31,20 @@ namespace Catalog.API.Controllers
             var p = await _context.Products.FindAsync(id);
             if (p == null) return NotFound();
 
-            return new ProductDto(p.Id, p.Name, p.Description, p.Price, p.ImageUrl, p.CategoryId, p.StockQuantity, p.CreatedAt);
+            return new ProductDto(p.Id, p.Name, p.Description, p.Price, p.ImageUrl, p.CategoryId, p.StockQuantity, p.Colors, p.Sizes, p.CreatedAt);
+        }
+
+        [HttpGet("{id}/related")]
+        public async Task<ActionResult<IEnumerable<ProductDto>>> GetRelatedProducts(Guid id)
+        {
+            var product = await _context.Products.FindAsync(id);
+            if (product == null) return NotFound();
+
+            return await _context.Products
+                .Where(p => p.CategoryId == product.CategoryId && p.Id != id)
+                .Take(4)
+                .Select(p => new ProductDto(p.Id, p.Name, p.Description, p.Price, p.ImageUrl, p.CategoryId, p.StockQuantity, p.Colors, p.Sizes, p.CreatedAt))
+                .ToListAsync();
         }
 
         [HttpPost]
@@ -44,14 +57,16 @@ namespace Catalog.API.Controllers
                 Price = dto.Price,
                 ImageUrl = dto.ImageUrl,
                 CategoryId = dto.CategoryId,
-                StockQuantity = dto.StockQuantity
+                StockQuantity = dto.StockQuantity,
+                Colors = dto.Colors,
+                Sizes = dto.Sizes
             };
 
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, 
-                new ProductDto(product.Id, product.Name, product.Description, product.Price, product.ImageUrl, product.CategoryId, product.StockQuantity, product.CreatedAt));
+                new ProductDto(product.Id, product.Name, product.Description, product.Price, product.ImageUrl, product.CategoryId, product.StockQuantity, product.Colors, product.Sizes, product.CreatedAt));
         }
 
         [HttpPut("{id}")]
@@ -66,6 +81,8 @@ namespace Catalog.API.Controllers
             product.ImageUrl = dto.ImageUrl;
             product.CategoryId = dto.CategoryId;
             product.StockQuantity = dto.StockQuantity;
+            product.Colors = dto.Colors;
+            product.Sizes = dto.Sizes;
 
             await _context.SaveChangesAsync();
             return NoContent();

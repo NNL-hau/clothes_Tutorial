@@ -8,6 +8,8 @@ namespace ClothesShop.Web.Models
         string? ImageUrl,
         Guid CategoryId,
         int StockQuantity,
+        string? Colors,
+        string? Sizes,
         DateTime CreatedAt
     );
 

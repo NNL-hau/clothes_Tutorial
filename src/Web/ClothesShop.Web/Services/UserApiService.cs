@@ -14,16 +14,29 @@ namespace ClothesShop.Web.Services
     public class UserApiService : IUserApiService
     {
         private readonly HttpClient _httpClient;
+        private readonly IAuthService _authService;
 
-        public UserApiService(IHttpClientFactory httpClientFactory)
+        public UserApiService(IHttpClientFactory httpClientFactory, IAuthService authService)
         {
             _httpClient = httpClientFactory.CreateClient("IdentityApi");
+            _authService = authService;
+        }
+
+        private async Task AddAuthHeaderAsync()
+        {
+            var token = await _authService.GetTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = 
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
         }
 
         public async Task<List<UserDto>> GetUsersAsync()
         {
             try
             {
+                await AddAuthHeaderAsync();
                 var users = await _httpClient.GetFromJsonAsync<List<UserDto>>("api/users");
                 return users ?? new List<UserDto>();
             }
@@ -38,6 +51,7 @@ namespace ClothesShop.Web.Services
         {
             try
             {
+                await AddAuthHeaderAsync();
                 var response = await _httpClient.PutAsJsonAsync($"api/users/{id}/role", role);
                 return response.IsSuccessStatusCode;
             }
@@ -52,6 +66,7 @@ namespace ClothesShop.Web.Services
         {
             try
             {
+                await AddAuthHeaderAsync();
                 var response = await _httpClient.DeleteAsync($"api/users/{id}");
                 return response.IsSuccessStatusCode;
             }

@@ -250,6 +250,5 @@ namespace Identity.API.Controllers
                 return StatusCode(500, new { message = "An error occurred during profile update" });
             }
         }
-        }
     }
 }

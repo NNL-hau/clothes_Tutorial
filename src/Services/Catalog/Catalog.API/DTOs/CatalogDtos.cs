@@ -1,7 +1,7 @@
 namespace Catalog.API.DTOs
 {
-    public record CreateProductDto(string Name, string? Description, decimal Price, string? ImageUrl, Guid CategoryId, int StockQuantity);
-    public record ProductDto(Guid Id, string Name, string? Description, decimal Price, string? ImageUrl, Guid CategoryId, int StockQuantity, DateTime CreatedAt);
+    public record CreateProductDto(string Name, string? Description, decimal Price, string? ImageUrl, Guid CategoryId, int StockQuantity, string? Colors, string? Sizes);
+    public record ProductDto(Guid Id, string Name, string? Description, decimal Price, string? ImageUrl, Guid CategoryId, int StockQuantity, string? Colors, string? Sizes, DateTime CreatedAt);
     
     public record CreateCategoryDto(string Name, string? Description);
     public record CategoryDto(Guid Id, string Name, string? Description);

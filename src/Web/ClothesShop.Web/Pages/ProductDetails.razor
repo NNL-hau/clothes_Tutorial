@@ -1,0 +1,415 @@
+@page "/product/{Id:guid}"
+@using ClothesShop.Web.Models
+@using ClothesShop.Web.Services
+@inject IProductApiService ProductService
+@inject IBasketService BasketService
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+
+<div class="product-details-page">
+    <div class="container">
+        @if (isLoading)
+        {
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Đang tải thông tin sản phẩm...</p>
+            </div>
+        }
+        else if (product == null)
+        {
+            <div class="error-state">
+                <h2>Không tìm thấy sản phẩm</h2>
+                <button class="btn-back" @onclick="GoBack">Quay lại trang chủ</button>
+            </div>
+        }
+        else
+        {
+            <div class="breadcrumb">
+                <a @onclick="GoBack" class="back-link"><i class="fa-solid fa-arrow-left"></i> Quay lại</a>
+                <span class="sep">/</span>
+                <span>@product.Name</span>
+            </div>
+
+            <div class="details-grid">
+                <div class="image-gallery">
+                    <img src="@(string.IsNullOrEmpty(product.ImageUrl) ? "/images/placeholder-product.jpg" : product.ImageUrl)" alt="@product.Name" />
+                </div>
+
+                <div class="product-info-panel">
+                    <h1 class="p-name">@product.Name</h1>
+                    <div class="p-price">@product.Price.ToString("N0") đ</div>
+
+                    <div class="p-options">
+                        @if (availableColors.Any())
+                        {
+                            <div class="option-group">
+                                <label>Màu sắc</label>
+                                <div class="chips">
+                                    @foreach (var color in availableColors)
+                                    {
+                                        <button class="chip @(selectedColor == color ? "active" : "")" 
+                                                @onclick="() => selectedColor = color">
+                                            @color
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        @if (availableSizes.Any())
+                        {
+                            <div class="option-group">
+                                <label>Kích cỡ</label>
+                                <div class="chips">
+                                    @foreach (var size in availableSizes)
+                                    {
+                                        <button class="chip @(selectedSize == size ? "active" : "")" 
+                                                @onclick="() => selectedSize = size">
+                                            @size
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="p-meta">
+                        <div class="meta-row">
+                            <span class="label">Trạng thái:</span>
+                            <span class="value @(product.StockQuantity > 0 ? "in-stock" : "out-of-stock")">
+                                @(product.StockQuantity > 0 ? "Còn hàng" : "Hết hàng")
+                            </span>
+                        </div>
+                        <div class="meta-row">
+                            <span class="label">Số lượng còn:</span>
+                            <span class="value">@product.StockQuantity</span>
+                        </div>
+                    </div>
+
+                    <div class="p-description">
+                        <h3>Mô tả sản phẩm</h3>
+                        <p>@(string.IsNullOrEmpty(product.Description) ? "Sản phẩm chất lượng cao từ Canifa Shop." : product.Description)</p>
+                    </div>
+
+                    <div class="actions">
+                        <button class="btn-add-to-cart" @onclick="HandleAddToCart" disabled="@(product.StockQuantity == 0 || isAdding)">
+                            @if (isAdding)
+                            {
+                                <i class="fa-solid fa-spinner fa-spin"></i>
+                                <span>Đang thêm...</span>
+                            }
+                            else
+                            {
+                                <i class="fa-solid fa-cart-plus"></i>
+                                <span>THÊM VÀO GIỎ HÀNG</span>
+                            }
+                        </button>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(message))
+                    {
+                        <div class="status-message @(isError ? "error" : "success")">
+                            <i class="fa-solid @(isError ? "fa-circle-exclamation" : "fa-circle-check")"></i>
+                            <span>@message</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    
+    private ProductDto? product;
+    private List<string> availableColors = new();
+    private List<string> availableSizes = new();
+    private string? selectedColor;
+    private string? selectedSize;
+    private bool isLoading = true;
+    private bool isAdding = false;
+    private string? message;
+    private bool isError = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadProduct();
+    }
+
+    private async Task LoadProduct()
+    {
+        isLoading = true;
+        try
+        {
+            product = await ProductService.GetProductAsync(Id);
+            if (product != null)
+            {
+                availableColors = (product.Colors ?? "").Split(',').Select(c => c.Trim()).Where(c => !string.IsNullOrEmpty(c)).ToList();
+                availableSizes = (product.Sizes ?? "").Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList();
+                
+                selectedColor = availableColors.FirstOrDefault();
+                selectedSize = availableSizes.FirstOrDefault();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading product: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleAddToCart()
+    {
+        if (product == null) return;
+        
+        message = null;
+        isError = false;
+
+        if (!await AuthService.IsAuthenticatedAsync())
+        {
+            message = "Vui lòng đăng nhập để thêm hàng vào giỏ!";
+            isError = true;
+            return;
+        }
+
+        isAdding = true;
+        try
+        {
+            // We need to pass the selected options. 
+            // Since AddToBasketAsync only takes ProductDto, we might need a workaround 
+            // or update the service. But for now, we'll set the options on the DTO or use a new method if we had one.
+            // Actually, BasketService.AddToBasketAsync uses default options. 
+            // Let's use UpdateQuantityAsync after adding if needed, or update AddToBasketAsync.
+            
+            // For now, let's update a temporary version of the product with selected options 
+            // if our service supports it, but it doesn't. 
+            // Let's call AddToBasket and then immediately update options if they differ from default.
+            
+            await BasketService.AddToBasketAsync(product);
+            
+            // If user selected non-default options, update them immediately
+            var defaultColor = availableColors.FirstOrDefault();
+            var defaultSize = availableSizes.FirstOrDefault();
+            
+            if (selectedColor != defaultColor || selectedSize != defaultSize)
+            {
+                await BasketService.UpdateOptionsAsync(product.Id, defaultColor, defaultSize, selectedColor, selectedSize);
+            }
+            
+            message = "Đã thêm vào giỏ hàng thành công!";
+        }
+        catch (Exception ex)
+        {
+            message = $"Lỗi: {ex.Message}";
+            isError = true;
+        }
+        finally
+        {
+            isAdding = false;
+        }
+    }
+
+    private void GoBack() => Navigation.NavigateTo("/");
+}
+
+<style>
+    .product-details-page {
+        padding: 40px 0;
+        background: #f8f9fa;
+        min-height: 80vh;
+    }
+    
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 20px;
+    }
+
+    .breadcrumb {
+        margin-bottom: 30px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #666;
+        font-size: 14px;
+    }
+
+    .back-link {
+        cursor: pointer;
+        color: #2F4858;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .back-link:hover {
+        text-decoration: underline;
+    }
+
+    .details-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 60px;
+        background: white;
+        padding: 40px;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    }
+
+    .image-gallery img {
+        width: 100%;
+        height: auto;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+
+    .p-name {
+        font-size: 32px;
+        font-weight: 800;
+        color: #1a1a1a;
+        margin-bottom: 10px;
+    }
+
+    .p-price {
+        font-size: 28px;
+        font-weight: 700;
+        color: #d32f2f;
+        margin-bottom: 30px;
+    }
+
+    .option-group {
+        margin-bottom: 25px;
+    }
+
+    .option-group label {
+        display: block;
+        font-weight: 700;
+        font-size: 14px;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+        color: #666;
+    }
+
+    .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .chip {
+        padding: 8px 20px;
+        border: 2.5px solid #eee;
+        background: white;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .chip:hover {
+        border-color: #2F4858;
+    }
+
+    .chip.active {
+        background: #2F4858;
+        color: white;
+        border-color: #2F4858;
+    }
+
+    .p-meta {
+        margin-bottom: 30px;
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 12px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+
+    .meta-row {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .meta-row .label {
+        font-size: 12px;
+        color: #999;
+        text-transform: uppercase;
+        font-weight: 700;
+    }
+
+    .meta-row .value {
+        font-weight: 700;
+        font-size: 18px;
+    }
+
+    .value.in-stock { color: #2e7d32; }
+    .value.out-of-stock { color: #d32f2f; }
+
+    .p-description h3 {
+        font-size: 16px;
+        font-weight: 800;
+        text-transform: uppercase;
+        margin-bottom: 15px;
+        color: #333;
+    }
+
+    .p-description p {
+        line-height: 1.8;
+        color: #555;
+    }
+
+    .actions {
+        margin-top: 40px;
+    }
+
+    .btn-add-to-cart {
+        width: 100%;
+        padding: 18px;
+        background: #1a1a1a;
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 18px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+    }
+
+    .btn-add-to-cart:hover:not(:disabled) {
+        background: #d32f2f;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(211,47,47,0.3);
+    }
+
+    .btn-add-to-cart:disabled {
+        background: #ddd;
+        color: #999;
+        cursor: not-allowed;
+    }
+
+    .status-message {
+        margin-top: 20px;
+        padding: 12px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 600;
+    }
+
+    .status-message.success { background: #e8f5e9; color: #2e7d32; }
+    .status-message.error { background: #ffebee; color: #d32f2f; }
+
+    @@media (max-width: 900px) {
+        .details-grid { grid-template-columns: 1fr; padding: 20px; }
+    }
+</style>
