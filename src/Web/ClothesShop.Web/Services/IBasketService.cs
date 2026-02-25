@@ -6,7 +6,7 @@ namespace ClothesShop.Web.Services
     {
         event Action OnChange;
         Task<CustomerBasket> GetBasketAsync();
-        Task AddToBasketAsync(ProductDto product);
+        Task AddToBasketAsync(ProductDto product, string? selectedColor = null, string? selectedSize = null);
         Task RemoveFromBasketAsync(Guid productId);
         Task ClearBasketAsync();
         Task<int> GetBasketItemCountAsync();

@@ -7,6 +7,8 @@ namespace ClothesShop.Web.Services
     public interface IReviewApiService
     {
         Task<List<ReviewDto>> GetReviewsAsync();
+        Task<List<ReviewDto>> GetReviewsByProductIdAsync(Guid productId);
+        Task<bool> CreateReviewAsync(ReviewDto review);
         Task<bool> ApproveReviewAsync(Guid id, bool approve);
         Task<bool> DeleteReviewAsync(Guid id);
     }
@@ -42,6 +44,33 @@ namespace ClothesShop.Web.Services
             catch
             {
                 return new();
+            }
+        }
+
+        public async Task<List<ReviewDto>> GetReviewsByProductIdAsync(Guid productId)
+        {
+            try
+            {
+                // No auth required for public viewing of reviews
+                return await _httpClient.GetFromJsonAsync<List<ReviewDto>>($"api/reviews/product/{productId}") ?? new();
+            }
+            catch
+            {
+                return new();
+            }
+        }
+
+        public async Task<bool> CreateReviewAsync(ReviewDto review)
+        {
+            try
+            {
+                await AddAuthHeaderAsync();
+                var response = await _httpClient.PostAsJsonAsync("api/reviews", review);
+                return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
             }
         }
 

@@ -130,7 +130,7 @@
     private async Task ScrollToBottom()
     {
         StateHasChanged();
-        // Additional scrolling logic if needed
+        await Task.CompletedTask;
     }
 
     private List<Suggestion> suggestions = new()

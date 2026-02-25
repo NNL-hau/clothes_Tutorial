@@ -98,6 +98,7 @@ services:
       - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__DefaultConnection=Server=clothes-db;Port=3306;Database=OrderingDb;User=root;Password=123456;
       - EventBus__Connection=rabbitmq
+      - CatalogApiUrl=http://catalog-api/api/products
     ports:
       - "5004:80"
     depends_on:

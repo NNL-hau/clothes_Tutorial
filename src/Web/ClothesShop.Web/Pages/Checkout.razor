@@ -1,11 +1,10 @@
 @page "/checkout"
 @inherits AuthorizedPageBase
 @inject IBasketService BasketService
-@inject IAuthService AuthService
 @inject IPaymentApiService PaymentApiService
 @inject IOrderApiService OrderApiService
+@inject IProductApiService ProductService
 @inject IEmailService EmailService
-@inject NavigationManager Navigation
 
 <div class="checkout-container">
     <div class="checkout-header">
@@ -501,11 +500,13 @@
                         {
                             successMessage = "Thanh toán VNPay thành công!";
                             
-                            // Xóa giỏ hàng và gửi email khi quay về từ VNPay thành công
+                            // Lưu snapshot giỏ hàng TRƯỚC khi xóa, để trừ tồn kho chính xác
+                            var basketSnapshot = await BasketService.GetBasketAsync();
                             await BasketService.ClearBasketAsync();
+                            await DeductStockFromBasketItems(basketSnapshot);
                             await EmailService.SendOrderConfirmationEmailAsync(checkoutForm.Email, checkoutForm.FullName, transaction.OrderId.ToString(), transaction.Amount);
                             
-                            await Task.Delay(2000);
+                            await Task.Delay(1500);
                             Navigation.NavigateTo($"/success/{transaction.OrderId}");
                         }
                         else
@@ -534,6 +535,9 @@
             StateHasChanged();
         }
     }
+    
+    private bool stockDeductionFailed = false;
+    private List<string> failedStockItems = new();
 
     private async Task LoadDataAsync()
     {
@@ -657,9 +661,11 @@
                 return;
             }
             
-            // Nếu là COD hoặc các phương thức khác không cần Redirect duyệt ngay
+            // COD và phương thức khác: trừ kho trước khi xóa giỏ
+            var basketSnapshot = await BasketService.GetBasketAsync();
             await BasketService.ClearBasketAsync();
-            await EmailService.SendOrderConfirmationEmailAsync(checkoutForm.Email, checkoutForm.FullName, createdOrder.Id.ToString(), basket.TotalPrice);
+            await DeductStockFromBasketItems(basketSnapshot);
+            await EmailService.SendOrderConfirmationEmailAsync(checkoutForm.Email, checkoutForm.FullName, createdOrder.Id.ToString(), basketSnapshot.TotalPrice);
 
             Console.WriteLine("[Checkout] Redirecting to success page.");
             Navigation.NavigateTo($"/success/{createdOrder.Id}");
@@ -671,6 +677,51 @@
         finally
         {
             isProcessing = false;
+        }
+    }
+
+    private async Task DeductStockFromBasketItems(CustomerBasket? snapshot = null)
+    {
+        var target = snapshot ?? basket;
+        if (target == null || !target.Items.Any())
+        {
+            Console.WriteLine("[Checkout] No basket items to deduct stock from.");
+            return;
+        }
+
+        Console.WriteLine($"[Checkout] Deducting stock for {target.Items.Count} item(s).");
+        stockDeductionFailed = false;
+        failedStockItems.Clear();
+
+        foreach (var item in target.Items)
+        {
+            try
+            {
+                Console.WriteLine($"[Checkout] Calling DeductStockAsync for {item.ProductName} x{item.Quantity}...");
+                var success = await ProductService.DeductStockAsync(item.ProductId, item.Quantity);
+                if (!success)
+                {
+                    Console.WriteLine($"[Checkout] API rejected stock deduction for {item.ProductName}.");
+                    stockDeductionFailed = true;
+                    failedStockItems.Add(item.ProductName);
+                }
+                else
+                {
+                    Console.WriteLine($"[Checkout] Stock deducted OK for {item.ProductName}.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Checkout] Error deducting stock for {item.ProductName}: {ex.Message}");
+                stockDeductionFailed = true;
+                failedStockItems.Add(item.ProductName);
+            }
+        }
+
+        if (stockDeductionFailed)
+        {
+            errorMessage = $"Lỗi cập nhật tồn kho: {string.Join(", ", failedStockItems)}. Đơn hàng vẫn được ghi nhận.";
+            StateHasChanged();
         }
     }
 

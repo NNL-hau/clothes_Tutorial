@@ -49,7 +49,7 @@
                                         <select @onchange="@(e => UpdateOptions(item, e.Value?.ToString(), item.SelectedSize))">
                                             @foreach (var color in (item.AvailableColors ?? "").Split(',').Select(c => c.Trim()).Where(c => !string.IsNullOrEmpty(c)))
                                             {
-                                                <option value="@color" selected="@(color == item.SelectedColor)">@color</option>
+                                                <option value="@color" selected="@(color.Trim().Equals(item.SelectedColor?.Trim(), StringComparison.OrdinalIgnoreCase))">@color</option>
                                             }
                                         </select>
                                     </div>
@@ -58,7 +58,7 @@
                                         <select @onchange="@(e => UpdateOptions(item, item.SelectedColor, e.Value?.ToString()))">
                                             @foreach (var size in (item.AvailableSizes ?? "").Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)))
                                             {
-                                                <option value="@size" selected="@(size == item.SelectedSize)">@size</option>
+                                                <option value="@size" selected="@(size.Trim().Equals(item.SelectedSize?.Trim(), StringComparison.OrdinalIgnoreCase))">@size</option>
                                             }
                                         </select>
                                     </div>
@@ -151,16 +151,16 @@
                 var product = await ProductApiService.GetProductAsync(item.ProductId);
                 if (product != null)
                 {
-                    item.AvailableColors = product.Colors;
-                    item.AvailableSizes = product.Sizes;
+                    item.AvailableColors = string.IsNullOrEmpty(product.Colors) ? "Đen, Trắng, Xanh" : product.Colors;
+                    item.AvailableSizes = string.IsNullOrEmpty(product.Sizes) ? "S, M, L, XL, XXL" : product.Sizes;
                     
-                    var colors = product.Colors?.Split(',').Select(c => c.Trim()).ToList();
-                    var sizes = product.Sizes?.Split(',').Select(s => s.Trim()).ToList();
+                    var colors = item.AvailableColors.Split(',').Select(c => c.Trim()).ToList();
+                    var sizes = item.AvailableSizes.Split(',').Select(s => s.Trim()).ToList();
                     
                     if (string.IsNullOrEmpty(item.SelectedColor))
-                        item.SelectedColor = colors?.FirstOrDefault();
+                        item.SelectedColor = colors.FirstOrDefault();
                     if (string.IsNullOrEmpty(item.SelectedSize))
-                        item.SelectedSize = sizes?.FirstOrDefault();
+                        item.SelectedSize = sizes.FirstOrDefault();
                 }
             }
         }

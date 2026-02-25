@@ -3,6 +3,7 @@
 @using ClothesShop.Web.Services
 @inject IProductApiService ProductService
 @inject IBasketService BasketService
+@inject IReviewApiService ReviewService
 @inject IAuthService AuthService
 @inject NavigationManager Navigation
 
@@ -59,16 +60,20 @@
                         @if (availableSizes.Any())
                         {
                             <div class="option-group">
-                                <label>Kích cỡ</label>
+                                <label>Kích cỡ <span class="required">*</span></label>
                                 <div class="chips">
                                     @foreach (var size in availableSizes)
                                     {
                                         <button class="chip @(selectedSize == size ? "active" : "")" 
-                                                @onclick="() => selectedSize = size">
+                                                @onclick="() => SelectSize(size)">
                                             @size
                                         </button>
                                     }
                                 </div>
+                                @if (showSizeError && string.IsNullOrEmpty(selectedSize))
+                                {
+                                    <div class="field-error">Vui lòng chọn kích cỡ!</div>
+                                }
                             </div>
                         }
                     </div>
@@ -115,6 +120,79 @@
                     }
                 </div>
             </div>
+
+            <div class="extra-sections">
+                <div class="reviews-section">
+                    <div class="section-header">
+                        <h2>Đánh giá từ khách hàng (@reviews.Count)</h2>
+                        <div class="avg-rating">
+                            @if (reviews.Any())
+                            {
+                                <div class="stars">
+                                    @for (int i = 1; i <= 5; i++)
+                                    {
+                                        <i class="fa-solid fa-star @(i <= Math.Round(reviews.Average(r => r.Rating)) ? "filled" : "")"></i>
+                                    }
+                                </div>
+                                <span class="rating-val">@reviews.Average(r => r.Rating).ToString("0.0")/5</span>
+                            }
+                        </div>
+                    </div>
+
+                    @if (!reviews.Any())
+                    {
+                        <p class="no-reviews">Chưa có đánh giá nào cho sản phẩm này.</p>
+                    }
+                    else
+                    {
+                        <div class="reviews-list">
+                            @foreach (var review in reviews.OrderByDescending(r => r.CreatedAt))
+                            {
+                                <div class="review-item">
+                                    <div class="review-meta">
+                                        <span class="reviewer">@review.UserName</span>
+                                        <span class="review-date">@review.CreatedAt.ToString("dd/MM/yyyy")</span>
+                                    </div>
+                                    <div class="review-rating">
+                                        @for (int i = 1; i <= 5; i++)
+                                        {
+                                            <i class="fa-solid fa-star @(i <= review.Rating ? "filled" : "")"></i>
+                                        }
+                                    </div>
+                                    <p class="review-comment">@review.Comment</p>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <div class="related-products-section">
+                    <div class="section-header">
+                        <h2>Sản phẩm tương tự</h2>
+                    </div>
+                    @if (relatedProducts.Any())
+                    {
+                        <div class="products-grid">
+                            @foreach (var rp in relatedProducts)
+                            {
+                                <div class="p-card" @onclick="() => NavigateToProduct(rp.Id)">
+                                    <div class="p-image">
+                                        <img src="@(string.IsNullOrEmpty(rp.ImageUrl) ? "/images/placeholder-product.jpg" : rp.ImageUrl)" alt="@rp.Name" />
+                                    </div>
+                                    <div class="p-details">
+                                        <h3 class="rp-name">@rp.Name</h3>
+                                        <div class="rp-price">@rp.Price.ToString("N0") đ</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p>Không có sản phẩm tương tự.</p>
+                    }
+                </div>
+            </div>
         }
     </div>
 </div>
@@ -125,12 +203,15 @@
     private ProductDto? product;
     private List<string> availableColors = new();
     private List<string> availableSizes = new();
+    private List<ReviewDto> reviews = new();
+    private List<ProductDto> relatedProducts = new();
     private string? selectedColor;
     private string? selectedSize;
     private bool isLoading = true;
     private bool isAdding = false;
     private string? message;
     private bool isError = false;
+    private bool showSizeError = false;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -140,16 +221,24 @@
     private async Task LoadProduct()
     {
         isLoading = true;
+        message = null;
+        selectedSize = null;
+        showSizeError = false;
         try
         {
             product = await ProductService.GetProductAsync(Id);
             if (product != null)
             {
+                if (string.IsNullOrEmpty(product.Sizes))
+                {
+                    product = product with { Sizes = "S, M, L, XL, XXL" };
+                }
+                
                 availableColors = (product.Colors ?? "").Split(',').Select(c => c.Trim()).Where(c => !string.IsNullOrEmpty(c)).ToList();
-                availableSizes = (product.Sizes ?? "").Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList();
+                availableSizes = product.Sizes.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList();
                 
                 selectedColor = availableColors.FirstOrDefault();
-                selectedSize = availableSizes.FirstOrDefault();
+                // selectedSize remains null to force selection
             }
         }
         catch (Exception ex)
@@ -160,6 +249,26 @@
         {
             isLoading = false;
         }
+        
+        // Load secondary data after main product data is shown
+        _ = LoadSecondaryDataAsync();
+    }
+
+    private async Task LoadSecondaryDataAsync()
+    {
+        try
+        {
+            var reviewTask = ReviewService.GetReviewsByProductIdAsync(Id);
+            var relatedTask = ProductService.GetRelatedProductsAsync(Id);
+            await Task.WhenAll(reviewTask, relatedTask);
+            reviews = await reviewTask;
+            relatedProducts = await relatedTask;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading secondary data: {ex.Message}");
+        }
     }
 
     private async Task HandleAddToCart()
@@ -168,6 +277,14 @@
         
         message = null;
         isError = false;
+
+        if (string.IsNullOrEmpty(selectedSize))
+        {
+            showSizeError = true;
+            message = "Vui lòng chọn kích cỡ!";
+            isError = true;
+            return;
+        }
 
         if (!await AuthService.IsAuthenticatedAsync())
         {
@@ -189,16 +306,7 @@
             // if our service supports it, but it doesn't. 
             // Let's call AddToBasket and then immediately update options if they differ from default.
             
-            await BasketService.AddToBasketAsync(product);
-            
-            // If user selected non-default options, update them immediately
-            var defaultColor = availableColors.FirstOrDefault();
-            var defaultSize = availableSizes.FirstOrDefault();
-            
-            if (selectedColor != defaultColor || selectedSize != defaultSize)
-            {
-                await BasketService.UpdateOptionsAsync(product.Id, defaultColor, defaultSize, selectedColor, selectedSize);
-            }
+            await BasketService.AddToBasketAsync(product, selectedColor, selectedSize);
             
             message = "Đã thêm vào giỏ hàng thành công!";
         }
@@ -213,6 +321,14 @@
         }
     }
 
+    private void SelectSize(string size)
+    {
+        selectedSize = size;
+        showSizeError = false;
+        if (message == "Vui lòng chọn kích cỡ!") message = null;
+    }
+
+    private void NavigateToProduct(Guid id) => Navigation.NavigateTo($"/product/{id}");
     private void GoBack() => Navigation.NavigateTo("/");
 }
 
@@ -409,7 +525,89 @@
     .status-message.success { background: #e8f5e9; color: #2e7d32; }
     .status-message.error { background: #ffebee; color: #d32f2f; }
 
+    .required { color: #d32f2f; }
+    .field-error { color: #d32f2f; font-size: 13px; font-weight: 600; margin-top: 8px; }
+
+    .extra-sections {
+        margin-top: 60px;
+        display: flex;
+        flex-direction: column;
+        gap: 60px;
+    }
+
+    .section-header {
+        margin-bottom: 30px;
+        border-bottom: 2px solid #eee;
+        padding-bottom: 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .section-header h2 {
+        font-size: 24px;
+        font-weight: 800;
+        color: #1a1a1a;
+    }
+
+    .avg-rating {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .stars { color: #ddd; }
+    .stars i.filled { color: #ffc107; }
+    .rating-val { font-weight: 700; color: #666; }
+
+    .reviews-list {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .review-item {
+        background: white;
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+
+    .review-meta {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+    }
+
+    .reviewer { font-weight: 800; color: #2F4858; }
+    .review-date { font-size: 12px; color: #999; }
+    .review-rating { margin-bottom: 12px; color: #ffc107; font-size: 12px; }
+    .review-comment { color: #555; line-height: 1.6; }
+    .no-reviews { color: #999; text-align: center; padding: 40px; }
+
+    .products-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 25px;
+    }
+
+    .p-card {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        cursor: pointer;
+        transition: transform 0.3s;
+    }
+
+    .p-card:hover { transform: translateY(-5px); }
+    .p-image img { width: 100%; height: 200px; object-fit: cover; }
+    .p-details { padding: 15px; }
+    .rp-name { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: #333; }
+    .rp-price { font-weight: 800; color: #d32f2f; }
+
     @@media (max-width: 900px) {
         .details-grid { grid-template-columns: 1fr; padding: 20px; }
+        .products-grid { grid-template-columns: 1fr 1fr; }
     }
 </style>

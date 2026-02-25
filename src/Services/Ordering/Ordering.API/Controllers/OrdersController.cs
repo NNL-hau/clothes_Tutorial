@@ -12,11 +12,13 @@ namespace Ordering.API.Controllers
     {
         private readonly OrderingDbContext _context;
         private readonly ILogger<OrdersController> _logger;
+        private readonly IConfiguration _configuration;
 
-        public OrdersController(OrderingDbContext context, ILogger<OrdersController> logger)
+        public OrdersController(OrderingDbContext context, ILogger<OrdersController> logger, IConfiguration configuration)
         {
             _context = context;
             _logger = logger;
+            _configuration = configuration;
         }
 
         [HttpGet]
@@ -126,11 +128,55 @@ namespace Ordering.API.Controllers
         [HttpPatch("{id}/status")]
         public async Task<IActionResult> UpdateOrderStatus(Guid id, [FromBody] UpdateOrderStatusDto dto)
         {
-            var order = await _context.Orders.FindAsync(id);
+            var order = await _context.Orders
+                .Include(o => o.OrderItems)
+                .FirstOrDefaultAsync(o => o.Id == id);
+                
             if (order == null) return NotFound();
 
+            var oldStatus = order.OrderStatus;
             order.OrderStatus = dto.Status;
             await _context.SaveChangesAsync();
+
+            // Nếu chuyển trạng thái sang Pending (Thanh toán thành công)
+            // thì thực hiện trừ tồn kho tại Catalog API
+            if (dto.Status == "Pending" && oldStatus != "Pending")
+            {
+                _logger.LogInformation("Order {OrderId} paid successfully. Deducting stock...", id);
+                
+                var catalogUrl = _configuration["CatalogApiUrl"];
+                if (string.IsNullOrEmpty(catalogUrl))
+                {
+                    _logger.LogError("CatalogApiUrl is not configured!");
+                }
+                else 
+                {
+                    using var client = new HttpClient();
+                    foreach (var item in order.OrderItems)
+                    {
+                        try 
+                        {
+                            // PATCH /api/products/{id}/deduct-stock?quantity={qty}
+                            var response = await client.PatchAsync($"{catalogUrl}/{item.ProductId}/deduct-stock?quantity={item.Quantity}", null);
+                            
+                            if (response.IsSuccessStatusCode)
+                            {
+                                _logger.LogInformation("Successfully deducted {Quantity} for Product {ProductId}", item.Quantity, item.ProductId);
+                            }
+                            else 
+                            {
+                                var error = await response.Content.ReadAsStringAsync();
+                                _logger.LogError("Failed to deduct stock for Product {ProductId}: {Error}", item.ProductId, error);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error calling Catalog API for Product {ProductId}", item.ProductId);
+                        }
+                    }
+                }
+            }
+
             return NoContent();
         }
 

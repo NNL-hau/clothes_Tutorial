@@ -12,6 +12,7 @@ namespace ClothesShop.Web.Services
         Task<bool> UpdateProductAsync(Guid id, CreateProductDto dto);
         Task<bool> DeleteProductAsync(Guid id);
         Task<List<ProductDto>> GetRelatedProductsAsync(Guid id);
+        Task<bool> DeductStockAsync(Guid id, int quantity);
     }
 
     public class ProductApiService : IProductApiService
@@ -122,6 +123,21 @@ namespace ClothesShop.Web.Services
             {
                 Console.WriteLine($"Error fetching related products for {id}: {ex.Message}");
                 return new List<ProductDto>();
+            }
+        }
+
+        public async Task<bool> DeductStockAsync(Guid id, int quantity)
+        {
+            try
+            {
+                await AddAuthHeaderAsync();
+                var response = await _httpClient.PatchAsync($"api/products/{id}/deduct-stock?quantity={quantity}", null);
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error deducting stock for {id}: {ex.Message}");
+                return false;
             }
         }
     }

@@ -10,8 +10,9 @@ builder.Services.AddControllers();
 // Configure Database
 builder.Services.AddDbContext<ReviewDbContext>(options =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+    options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 0)));
 });
 
 // Configure Swagger
@@ -40,28 +41,28 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+}
 
-    // Auto-migrate database on startup
-    using (var scope = app.Services.CreateScope())
+// Initialize Database (runs in ALL environments including Docker)
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ReviewDbContext>();
+    
+    // Simple retry logic for DB connectivity in Docker
+    int retries = 5;
+    while (retries > 0)
     {
-        var db = scope.ServiceProvider.GetRequiredService<ReviewDbContext>();
-        
-        // Simple retry logic for DB connectivity in Docker
-        int retries = 5;
-        while (retries > 0)
+        try 
         {
-            try 
-            {
-                db.Database.EnsureCreated();
-                break;
-            }
-            catch (Exception ex)
-            {
-                retries--;
-                if (retries == 0) throw;
-                Console.WriteLine($"[Review.API] Database not ready, retrying... ({5-retries}/5): {ex.Message}");
-                Thread.Sleep(5000);
-            }
+            db.Database.EnsureCreated();
+            break;
+        }
+        catch (Exception ex)
+        {
+            retries--;
+            if (retries == 0) throw;
+            Console.WriteLine($"[Review.API] Database not ready, retrying... ({5-retries}/5): {ex.Message}");
+            Thread.Sleep(5000);
         }
     }
 }

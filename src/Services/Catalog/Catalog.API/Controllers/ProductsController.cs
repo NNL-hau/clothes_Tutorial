@@ -88,6 +88,22 @@ namespace Catalog.API.Controllers
             return NoContent();
         }
 
+        [HttpPatch("{id}/deduct-stock")]
+        public async Task<IActionResult> DeductStock(Guid id, [FromQuery] int quantity)
+        {
+            var product = await _context.Products.FindAsync(id);
+            if (product == null) return NotFound();
+
+            if (product.StockQuantity < quantity)
+            {
+                return BadRequest("Not enough stock available.");
+            }
+
+            product.StockQuantity -= quantity;
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProduct(Guid id)
         {

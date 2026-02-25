@@ -49,17 +49,65 @@ using (var scope = app.Services.CreateScope())
         try 
         {
             context.Database.EnsureCreated();
-            
+
+            // Use ADO.NET directly to safely check and add columns
+            // (EF Core SqlQueryRaw<string> cannot map scalar primitives)
+            var conn = context.Database.GetDbConnection();
+            conn.Open();
+            try
+            {
+                // Check & add Colors column
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_SCHEMA = DATABASE()
+                          AND TABLE_NAME = 'Products'
+                          AND COLUMN_NAME = 'Colors'";
+                    var count = Convert.ToInt32(cmd.ExecuteScalar());
+                    if (count == 0)
+                    {
+                        cmd.CommandText = "ALTER TABLE Products ADD COLUMN Colors VARCHAR(500) NULL";
+                        cmd.ExecuteNonQuery();
+                        Console.WriteLine("[Catalog.API] Added Colors column to Products table.");
+                    }
+                }
+
+                // Check & add Sizes column
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_SCHEMA = DATABASE()
+                          AND TABLE_NAME = 'Products'
+                          AND COLUMN_NAME = 'Sizes'";
+                    var count = Convert.ToInt32(cmd.ExecuteScalar());
+                    if (count == 0)
+                    {
+                        cmd.CommandText = "ALTER TABLE Products ADD COLUMN Sizes VARCHAR(500) NULL";
+                        cmd.ExecuteNonQuery();
+                        Console.WriteLine("[Catalog.API] Added Sizes column to Products table.");
+                    }
+                }
+            }
+            finally
+            {
+                conn.Close();
+            }
+
             // Seed Colors and Sizes for existing products if they are empty
-            var products = context.Products.Where(p => string.IsNullOrEmpty(p.Colors) || string.IsNullOrEmpty(p.Sizes)).ToList();
+            var products = context.Products
+                .Where(p => string.IsNullOrEmpty(p.Colors) || string.IsNullOrEmpty(p.Sizes))
+                .ToList();
             if (products.Any())
             {
                 foreach (var p in products)
                 {
-                    p.Colors = "Đen, Trắng, Xanh, Đỏ";
-                    p.Sizes = "S, M, L, XL, XXL";
+                    if (string.IsNullOrEmpty(p.Colors)) p.Colors = "Đen, Trắng, Xanh, Đỏ";
+                    if (string.IsNullOrEmpty(p.Sizes)) p.Sizes = "S, M, L, XL, XXL";
                 }
                 context.SaveChanges();
+                Console.WriteLine($"[Catalog.API] Seeded Colors/Sizes for {products.Count} products.");
             }
             
             break;

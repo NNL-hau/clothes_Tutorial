@@ -39,23 +39,24 @@ namespace ClothesShop.Web.Services
             return basket ?? new CustomerBasket();
         }
 
-        public async Task AddToBasketAsync(ProductDto product)
+        public async Task AddToBasketAsync(ProductDto product, string? selectedColor = null, string? selectedSize = null)
         {
             if (!await _authService.IsAuthenticatedAsync())
                 return;
 
             var basket = await GetBasketAsync();
             
-            var colors = product.Colors?.Split(',').Select(c => c.Trim()).ToList();
-            var sizes = product.Sizes?.Split(',').Select(s => s.Trim()).ToList();
+            // If options are not provided, fall back to defaults (backward compatibility)
+            if (string.IsNullOrEmpty(selectedColor))
+                selectedColor = product.Colors?.Split(',').Select(c => c.Trim()).FirstOrDefault();
             
-            var defaultColor = colors?.FirstOrDefault();
-            var defaultSize = sizes?.FirstOrDefault();
+            if (string.IsNullOrEmpty(selectedSize))
+                selectedSize = product.Sizes?.Split(',').Select(s => s.Trim()).FirstOrDefault();
 
-            // Try to find item with same product ID AND default selected options
+            // Try to find item with same product ID AND same selected options
             var item = basket.Items.FirstOrDefault(i => i.ProductId == product.Id && 
-                                                      (i.SelectedColor == defaultColor || (i.SelectedColor == null && defaultColor == null)) && 
-                                                      (i.SelectedSize == defaultSize || (i.SelectedSize == null && defaultSize == null)));
+                                                       (i.SelectedColor == selectedColor || (i.SelectedColor == null && selectedColor == null)) && 
+                                                       (i.SelectedSize == selectedSize || (i.SelectedSize == null && selectedSize == null)));
 
             if (item == null)
             {
@@ -67,18 +68,20 @@ namespace ClothesShop.Web.Services
                     ImageUrl = product.ImageUrl,
                     Quantity = 1,
                     StockQuantity = product.StockQuantity,
-                    AvailableColors = product.Colors,
-                    AvailableSizes = product.Sizes,
-                    SelectedColor = defaultColor,
-                    SelectedSize = defaultSize
+                    AvailableColors = string.IsNullOrEmpty(product.Colors) ? "Đen, Trắng, Xanh" : product.Colors,
+                    AvailableSizes = string.IsNullOrEmpty(product.Sizes) ? "S, M, L, XL, XXL" : product.Sizes,
+                    SelectedColor = selectedColor,
+                    SelectedSize = selectedSize
                 });
             }
             else
             {
                 item.Quantity++;
-                // Ensure metadata is updated even if item already existed
-                item.AvailableColors = product.Colors;
-                item.AvailableSizes = product.Sizes;
+                // Update metadata if it was missing
+                if (string.IsNullOrEmpty(item.AvailableColors)) 
+                    item.AvailableColors = string.IsNullOrEmpty(product.Colors) ? "Đen, Trắng, Xanh" : product.Colors;
+                if (string.IsNullOrEmpty(item.AvailableSizes)) 
+                    item.AvailableSizes = string.IsNullOrEmpty(product.Sizes) ? "S, M, L, XL, XXL" : product.Sizes;
             }
 
             var key = GetBasketKey();
