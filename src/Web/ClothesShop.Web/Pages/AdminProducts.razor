@@ -60,6 +60,7 @@
                             <th>Danh mục</th>
                             <th>Giá bán</th>
                             <th>Tồn kho</th>
+                            <th>Đã bán</th>
                             <th>Trạng thái</th>
                             <th class="text-center">Thao tác</th>
                         </tr>
@@ -71,7 +72,7 @@
                                 <td>
                                     <div class="product-info-cell">
                                         <div class="product-img-box">
-                                            <img src="@(string.IsNullOrEmpty(p.ImageUrl) ? "https://via.placeholder.com/56" : p.ImageUrl)" />
+                                            <img src="@ProductHelpers.GetFirstImageUrl(p.ImageUrl, "https://via.placeholder.com/56")" />
                                         </div>
                                         <div>
                                             <div class="product-name">@p.Name</div>
@@ -89,11 +90,16 @@
                                         </div>
                                     </div>
                                 </td>
+
                                 <td>
-                                    <span class="status-badge @(p.StockQuantity > 10 ? "status-success" : "status-warning")">
+                                    <strong>@p.SoldQuantity</strong>
+                                </td>
+                                <td>
+                                    <span class="status-badge @(p.StockQuantity > 10 ? "status-success" : (p.StockQuantity > 0 ? "status-warning" : "status-danger"))">
                                         <i class="fa-solid fa-circle me-1" style="font-size: 0.5rem;"></i>
-                                        @(p.StockQuantity > 10 ? "Đang bán" : "Sắp hết hàng")
+                                        @(p.StockQuantity > 10 ? "Đang bán" : (p.StockQuantity > 0 ? "Sắp hết hàng" : "Hết hàng"))
                                     </span>
+
                                 </td>
                                 <td>
                                     <div class="action-buttons">
@@ -213,18 +219,50 @@
                         </li>
                     </ul>
                     
-                    @if (imageInputMode == "upload")
+                    <div class="d-flex gap-2 mb-3">
+                        <div class="flex-grow-1">
+                            @if (imageInputMode == "upload")
+                            {
+                                <ImageUploadComponent @bind-ImageUrl="tempImageUrl" />
+                            }
+                            else
+                            {
+                                <div class="input-group-premium">
+                                    <input type="text" class="form-control-custom @(validationErrors.ContainsKey("ImageUrl") ? "is-invalid" : "")" 
+                                           @bind="tempImageUrl" placeholder="Nhập URL hình ảnh..." />
+                                    @if (validationErrors.ContainsKey("ImageUrl"))
+                                    {
+                                        <div class="invalid-feedback d-block">@validationErrors["ImageUrl"]</div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                        <button type="button" class="btn btn-primary-fashion" style="height: fit-content; align-self: end;" 
+                                @onclick="AddImageToList" disabled="@string.IsNullOrEmpty(tempImageUrl)">
+                            <i class="fa-solid fa-plus"></i> Thêm
+                        </button>
+                    </div>
+
+                    @if (selectedImages.Any())
                     {
-                        <ImageUploadComponent @bind-ImageUrl="formData.ImageUrl" />
+                        <div class="image-manage-grid">
+                            @foreach (var (img, index) in selectedImages.Select((value, i) => (value, i)))
+                            {
+                                <div class="image-manage-item">
+                                    <img src="@img" alt="Product image @index" />
+                                    <button type="button" class="btn-remove-mini" @onclick="() => RemoveImage(index)" title="Xóa ảnh này">
+                                        <i class="fa-solid fa-circle-xmark"></i>
+                                    </button>
+                                </div>
+                            }
+                        </div>
                     }
                     else
                     {
-                        <input type="text" class="form-control-custom @(validationErrors.ContainsKey("ImageUrl") ? "is-invalid" : "")" 
-                               @bind="formData.ImageUrl" placeholder="https://example.com/image.jpg" />
-                        @if (validationErrors.ContainsKey("ImageUrl"))
-                        {
-                            <div class="invalid-feedback d-block">@validationErrors["ImageUrl"]</div>
-                        }
+                        <div class="no-images-placeholder text-center py-4">
+                            <i class="fa-solid fa-images mb-2" style="font-size: 2rem; color: #cbd5e1;"></i>
+                            <p class="text-muted small">Chưa có hình ảnh nào được thêm.</p>
+                        </div>
                     }
                 </div>
 
@@ -427,6 +465,12 @@
         background: #fffbeb;
         color: #d97706;
     }
+
+    .status-danger {
+        background: #fef2f2;
+        color: #dc2626;
+    }
+
 
     .action-buttons {
         display: flex;
@@ -636,6 +680,59 @@
         color: var(--primary-color);
         border-bottom-color: var(--primary-color);
     }
+
+    /* Multi-image styles */
+    .image-manage-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 15px;
+        padding: 15px;
+        background: #f8fafc;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .image-manage-item {
+        position: relative;
+        aspect-ratio: 1;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 2px solid white;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .image-manage-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .btn-remove-mini {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: none;
+        border: none;
+        color: #ef4444;
+        font-size: 1.2rem;
+        padding: 0;
+        line-height: 1;
+        cursor: pointer;
+        transition: transform 0.2s;
+        z-index: 10;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+    }
+
+    .btn-remove-mini:hover {
+        transform: scale(1.2);
+        color: #dc2626;
+    }
+
+    .no-images-placeholder {
+        background: #f8fafc;
+        border: 2px dashed #e2e8f0;
+        border-radius: 16px;
+    }
 </style>
 
 @code {
@@ -657,6 +754,8 @@
     private string formError = string.Empty;
     private ProductDto? editingProduct = null;
     private string imageInputMode = "upload"; // "upload" or "url"
+    private string tempImageUrl = string.Empty;
+    private List<string> selectedImages = new();
     
     // Delete confirmation
     private bool showDeleteConfirm = false;
@@ -780,6 +879,8 @@
         isEditMode = false;
         editingProduct = null;
         formData = new ProductFormData();
+        selectedImages.Clear();
+        tempImageUrl = string.Empty;
         validationErrors.Clear();
         formError = string.Empty;
         imageInputMode = "upload";
@@ -790,6 +891,10 @@
     {
         isEditMode = true;
         editingProduct = product;
+        
+        selectedImages = (product.ImageUrl ?? "").Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList();
+        tempImageUrl = string.Empty;
+
         formData = new ProductFormData
         {
             Name = product.Name,
@@ -848,6 +953,9 @@
 
     private async Task SaveProduct()
     {
+        // Combine images before validation/save
+        formData.ImageUrl = string.Join(",", selectedImages);
+
         if (!ValidateForm())
         {
             formError = "Vui lòng kiểm tra lại thông tin đã nhập";
@@ -948,6 +1056,23 @@
         finally
         {
             isDeleting = false;
+        }
+    }
+
+    private void AddImageToList()
+    {
+        if (!string.IsNullOrEmpty(tempImageUrl))
+        {
+            selectedImages.Add(tempImageUrl);
+            tempImageUrl = string.Empty;
+        }
+    }
+
+    private void RemoveImage(int index)
+    {
+        if (index >= 0 && index < selectedImages.Count)
+        {
+            selectedImages.RemoveAt(index);
         }
     }
 

@@ -12,12 +12,13 @@ namespace ClothesShop.Web.Models
         public string? SelectedSize { get; set; }
         public string? AvailableColors { get; set; }
         public string? AvailableSizes { get; set; }
+        public bool IsSelected { get; set; } = true;
     }
 
     public class CustomerBasket
     {
         public List<BasketItem> Items { get; set; } = new();
-        public decimal TotalPrice => Items.Sum(i => i.Price * i.Quantity);
-        public int TotalItems => Items.Sum(i => i.Quantity);
+        public decimal TotalPrice => Items.Where(i => i.IsSelected).Sum(i => i.Price * i.Quantity);
+        public int TotalItems => Items.Where(i => i.IsSelected).Sum(i => i.Quantity);
     }
 }

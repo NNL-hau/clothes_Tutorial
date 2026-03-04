@@ -185,6 +185,7 @@ namespace ClothesShop.Web.Services
                         await _localStorage.SetItemAsStringAsync(TOKEN_KEY, authResponse.Token);
                         _httpClient.DefaultRequestHeaders.Authorization = 
                             new AuthenticationHeaderValue("Bearer", authResponse.Token);
+                        CurrentUser = await GetCurrentUserAsync();
                         OnAuthStateChanged?.Invoke();
                     }
                     return authResponse;

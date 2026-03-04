@@ -1,6 +1,7 @@
 @page "/product/{Id:guid}"
 @using ClothesShop.Web.Models
 @using ClothesShop.Web.Services
+@using ClothesShop.Web.Helpers
 @inject IProductApiService ProductService
 @inject IBasketService BasketService
 @inject IReviewApiService ReviewService
@@ -33,7 +34,35 @@
 
             <div class="details-grid">
                 <div class="image-gallery">
-                    <img src="@(string.IsNullOrEmpty(product.ImageUrl) ? "/images/placeholder-product.jpg" : product.ImageUrl)" alt="@product.Name" />
+                    <div class="main-banner">
+                        <img src="@(productImages.Any() ? productImages[currentImageIndex] : "/images/placeholder-product.jpg")" alt="@product.Name" class="active-banner-img" />
+                        
+                        @if (productImages.Count > 1)
+                        {
+                            <button class="nav-btn prev" @onclick="PrevImage"><i class="fa-solid fa-chevron-left"></i></button>
+                            <button class="nav-btn next" @onclick="NextImage"><i class="fa-solid fa-chevron-right"></i></button>
+                            
+                            <div class="banner-dots">
+                                @for (int i = 0; i < productImages.Count; i++)
+                                {
+                                    int index = i;
+                                    <span class="dot @(currentImageIndex == index ? "active" : "")" @onclick="() => currentImageIndex = index"></span>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    @if (productImages.Count > 1)
+                    {
+                        <div class="thumbnail-list">
+                            @foreach (var (img, index) in productImages.Select((value, i) => (value, i)))
+                            {
+                                <div class="thumb-item @(currentImageIndex == index ? "active" : "")" @onclick="() => currentImageIndex = index">
+                                    <img src="@img" alt="thumbnail @index" />
+                                </div>
+                            }
+                        </div>
+                    }
                 </div>
 
                 <div class="product-info-panel">
@@ -64,10 +93,13 @@
                                 <div class="chips">
                                     @foreach (var size in availableSizes)
                                     {
-                                        <button class="chip @(selectedSize == size ? "active" : "")" 
-                                                @onclick="() => SelectSize(size)">
-                                            @size
-                                        </button>
+                                        <div class="chip-wrapper">
+                                            <button class="chip @(selectedSize == size ? "active" : "")" 
+                                                    @onclick="() => SelectSize(size)">
+                                                @size
+                                            </button>
+                                            <div class="size-tooltip">@GetSizeRecommendation(size)</div>
+                                        </div>
                                     }
                                 </div>
                                 @if (showSizeError && string.IsNullOrEmpty(selectedSize))
@@ -76,6 +108,60 @@
                                 }
                             </div>
                         }
+
+                        <div class="size-guide-accordion">
+                            <div class="accordion-header" @onclick="() => isSizeGuideOpen = !isSizeGuideOpen">
+                                <span>Hướng dẫn chọn kích cỡ</span>
+                                <i class="fa-solid fa-chevron-@(isSizeGuideOpen ? "up" : "down")"></i>
+                            </div>
+                            @if (isSizeGuideOpen)
+                            {
+                                <div class="accordion-content">
+                                    <table class="size-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Size (Quốc Tế)</th>
+                                                <th>Vai (cm)</th>
+                                                <th>Vòng ngực (cm)</th>
+                                                <th>Eo (cm)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="@(selectedSize == "S" ? "highlight" : "")">
+                                                <td>S</td>
+                                                <td>44</td>
+                                                <td>85</td>
+                                                <td>88</td>
+                                            </tr>
+                                            <tr class="@(selectedSize == "M" ? "highlight" : "")">
+                                                <td>M</td>
+                                                <td>45</td>
+                                                <td>90</td>
+                                                <td>92</td>
+                                            </tr>
+                                            <tr class="@(selectedSize == "L" ? "highlight" : "")">
+                                                <td>L</td>
+                                                <td>46</td>
+                                                <td>100</td>
+                                                <td>96</td>
+                                            </tr>
+                                            <tr class="@(selectedSize == "XL" ? "highlight" : "")">
+                                                <td>XL</td>
+                                                <td>47</td>
+                                                <td>103</td>
+                                                <td>100</td>
+                                            </tr>
+                                            <tr class="@(selectedSize == "XXL" ? "highlight" : "")">
+                                                <td>XXL</td>
+                                                <td>48</td>
+                                                <td>106</td>
+                                                <td>104</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </div>
                     </div>
 
                     <div class="p-meta">
@@ -89,7 +175,12 @@
                             <span class="label">Số lượng còn:</span>
                             <span class="value">@product.StockQuantity</span>
                         </div>
+                        <div class="meta-row">
+                            <span class="label">Đã bán:</span>
+                            <span class="value">@product.SoldQuantity</span>
+                        </div>
                     </div>
+
 
                     <div class="p-description">
                         <h3>Mô tả sản phẩm</h3>
@@ -139,6 +230,73 @@
                         </div>
                     </div>
 
+                    @* ===== REVIEW FORM ===== *@
+                    @if (isLoggedIn)
+                    {
+                        <div class="review-form-card">
+                            <h3><i class="fa-solid fa-pen-to-square me-2"></i>Viết đánh giá của bạn</h3>
+                            <div class="star-picker">
+                                <span>Chất lượng sản phẩm:</span>
+                                <div class="stars-input">
+                                    @for (int i = 5; i >= 1; i--)
+                                    {
+                                        int starVal = i;
+                                        <span class="star-opt @(newReviewRating >= starVal ? "selected" : "")" 
+                                              @onclick="() => newReviewRating = starVal"
+                                              @onmouseover="() => hoverRating = starVal"
+                                              @onmouseout="() => hoverRating = 0">
+                                            <i class="fa-solid fa-star"></i>
+                                        </span>
+                                    }
+                                </div>
+                                @if (newReviewRating > 0)
+                                {
+                                    <span class="star-label">@GetRatingLabel(newReviewRating)</span>
+                                }
+                            </div>
+                            <textarea class="review-textarea" 
+                                      @bind="newReviewComment"
+                                      placeholder="Chia sẻ cảm nhận của bạn về sản phẩm này..."
+                                      rows="4"
+                                      maxlength="1000"></textarea>
+                            @if (!string.IsNullOrEmpty(reviewError))
+                            {
+                                <div class="review-error">
+                                    <i class="fa-solid fa-triangle-exclamation me-1"></i>@reviewError
+                                </div>
+                            }
+                            @if (!string.IsNullOrEmpty(reviewSuccess))
+                            {
+                                <div class="review-success">
+                                    <i class="fa-solid fa-circle-check me-1"></i>@reviewSuccess
+                                </div>
+                            }
+                            <div class="review-form-actions">
+                                <span class="char-count">@(newReviewComment?.Length ?? 0)/1000 ký tự</span>
+                                <button class="btn-submit-review" @onclick="SubmitReview" disabled="@isSubmittingReview">
+                                    @if (isSubmittingReview)
+                                    {
+                                        <i class="fa-solid fa-spinner fa-spin"></i>
+                                        <span>Đang gửi...</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="fa-solid fa-paper-plane"></i>
+                                        <span>Gửi đánh giá</span>
+                                    }
+                                </button>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="login-to-review">
+                            <i class="fa-solid fa-lock"></i>
+                            <span><a href="/login">Đăng nhập</a> để viết đánh giá của bạn</span>
+                        </div>
+                    }
+
+                    @* ===== REVIEWS LIST ===== *@
                     @if (!reviews.Any())
                     {
                         <p class="no-reviews">Chưa có đánh giá nào cho sản phẩm này.</p>
@@ -149,17 +307,23 @@
                             @foreach (var review in reviews.OrderByDescending(r => r.CreatedAt))
                             {
                                 <div class="review-item">
-                                    <div class="review-meta">
-                                        <span class="reviewer">@review.UserName</span>
-                                        <span class="review-date">@review.CreatedAt.ToString("dd/MM/yyyy")</span>
+                                    <div class="review-avatar">
+                                        @review.UserName.Substring(0, 1).ToUpper()
                                     </div>
-                                    <div class="review-rating">
-                                        @for (int i = 1; i <= 5; i++)
-                                        {
-                                            <i class="fa-solid fa-star @(i <= review.Rating ? "filled" : "")"></i>
-                                        }
+                                    <div class="review-body">
+                                        <div class="review-meta">
+                                            <span class="reviewer">@review.UserName</span>
+                                            <span class="review-date">@review.CreatedAt.ToString("dd/MM/yyyy")</span>
+                                        </div>
+                                        <div class="review-rating">
+                                            @for (int i = 1; i <= 5; i++)
+                                            {
+                                                <i class="fa-solid fa-star @(i <= review.Rating ? "filled" : "")"></i>
+                                            }
+                                            <span class="rating-text">@GetRatingLabel(review.Rating)</span>
+                                        </div>
+                                        <p class="review-comment">@review.Comment</p>
                                     </div>
-                                    <p class="review-comment">@review.Comment</p>
                                 </div>
                             }
                         </div>
@@ -177,7 +341,7 @@
                             {
                                 <div class="p-card" @onclick="() => NavigateToProduct(rp.Id)">
                                     <div class="p-image">
-                                        <img src="@(string.IsNullOrEmpty(rp.ImageUrl) ? "/images/placeholder-product.jpg" : rp.ImageUrl)" alt="@rp.Name" />
+                                        <img src="@ProductHelpers.GetFirstImageUrl(rp.ImageUrl)" alt="@rp.Name" />
                                     </div>
                                     <div class="p-details">
                                         <h3 class="rp-name">@rp.Name</h3>
@@ -205,6 +369,8 @@
     private List<string> availableSizes = new();
     private List<ReviewDto> reviews = new();
     private List<ProductDto> relatedProducts = new();
+    private List<string> productImages = new();
+    private int currentImageIndex = 0;
     private string? selectedColor;
     private string? selectedSize;
     private bool isLoading = true;
@@ -212,9 +378,20 @@
     private string? message;
     private bool isError = false;
     private bool showSizeError = false;
+    private bool isSizeGuideOpen = false;
+
+    // Review state
+    private bool isLoggedIn = false;
+    private int newReviewRating = 0;
+    private int hoverRating = 0;
+    private string? newReviewComment;
+    private string? reviewError;
+    private string? reviewSuccess;
+    private bool isSubmittingReview = false;
 
     protected override async Task OnParametersSetAsync()
     {
+        isLoggedIn = await AuthService.IsAuthenticatedAsync();
         await LoadProduct();
     }
 
@@ -233,10 +410,31 @@
                 {
                     product = product with { Sizes = "S, M, L, XL, XXL" };
                 }
+
+                if (string.IsNullOrEmpty(product.Colors))
+                {
+                    product = product with { Colors = "Vàng, Trắng, Đen, Đỏ, Xanh" };
+                }
                 
                 availableColors = (product.Colors ?? "").Split(',').Select(c => c.Trim()).Where(c => !string.IsNullOrEmpty(c)).ToList();
                 availableSizes = product.Sizes.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList();
+
+                // Prepare images for carousel
+                productImages = (product.ImageUrl ?? "").Split(',').Select(i => i.Trim()).Where(i => !string.IsNullOrEmpty(i)).ToList();
+                if (!productImages.Any()) productImages.Add("/images/placeholder-product.jpg");
                 
+                // For demonstration purposes, if only one image, let's add placeholders to show banner functionality
+                if (productImages.Count == 1 && !string.IsNullOrEmpty(product.ImageUrl))
+                {
+                    // Add some dummy variant images to simulate a gallery if it's a real image
+                    if (!product.ImageUrl.Contains("placeholder"))
+                    {
+                         productImages.Add(product.ImageUrl); // Repeat same for demo
+                         productImages.Add(product.ImageUrl);
+                    }
+                }
+                
+                currentImageIndex = 0;
                 selectedColor = availableColors.FirstOrDefault();
                 // selectedSize remains null to force selection
             }
@@ -328,6 +526,87 @@
         if (message == "Vui lòng chọn kích cỡ!") message = null;
     }
 
+    private async Task SubmitReview()
+    {
+        reviewError = null;
+        reviewSuccess = null;
+
+        if (newReviewRating == 0)
+        {
+            reviewError = "Vui lòng chọn số sao đánh giá.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newReviewComment) || newReviewComment.Trim().Length < 5)
+        {
+            reviewError = "Vui lòng nhập nhận xét ít nhất 5 ký tự.";
+            return;
+        }
+
+        isSubmittingReview = true;
+        try
+        {
+            var userName = await AuthService.GetUserNameAsync();
+            var review = new ReviewDto(
+                Guid.NewGuid(),
+                Id,
+                userName ?? "Khách hàng",
+                newReviewRating,
+                newReviewComment.Trim(),
+                DateTime.Now,
+                false
+            );
+
+            var success = await ReviewService.CreateReviewAsync(review);
+            if (success)
+            {
+                reviewSuccess = "Cảm ơn bạn đã đánh giá!";
+                newReviewRating = 0;
+                newReviewComment = null;
+                // Reload reviews to reflect any approved ones
+                reviews = await ReviewService.GetReviewsByProductIdAsync(Id);
+            }
+            else
+            {
+                reviewError = "Không thể gửi đánh giá. Vui lòng thử lại sau.";
+            }
+        }
+        catch
+        {
+            reviewError = "Đã xảy ra lỗi. Vui lòng thử lại sau.";
+        }
+        finally
+        {
+            isSubmittingReview = false;
+        }
+    }
+
+    private string GetRatingLabel(int rating) => rating switch
+    {
+        1 => "Rất tệ",
+        2 => "Tệ",
+        3 => "Bình thường",
+        4 => "Tốt",
+        5 => "Xuất sắc",
+        _ => ""
+    };
+
+    private void NextImage() => currentImageIndex = (currentImageIndex + 1) % productImages.Count;
+    private void PrevImage() => currentImageIndex = (currentImageIndex - 1 + productImages.Count) % productImages.Count;
+
+    private string GetSizeRecommendation(string size)
+    {
+        return size.ToUpper() switch
+        {
+            "S" => "Cân nặng: 48-55kg | Cao: 158-165cm",
+            "M" => "Cân nặng: 56-65kg | Cao: 166-171cm",
+            "L" => "Cân nặng: 66-75kg | Cao: 172-177cm",
+            "XL" => "Cân nặng: 76-85kg | Cao: 178-183cm",
+            "XXL" => "Cân nặng: 86-95kg | Cao: 184-190cm",
+            _ => "Liên hệ CSKH để được tư vấn"
+        };
+    }
+
     private void NavigateToProduct(Guid id) => Navigation.NavigateTo($"/product/{id}");
     private void GoBack() => Navigation.NavigateTo("/");
 }
@@ -375,25 +654,124 @@
         box-shadow: 0 10px 30px rgba(0,0,0,0.05);
     }
 
-    .image-gallery img {
+    .image-gallery {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .main-banner {
+        position: relative;
         width: 100%;
-        height: auto;
-        border-radius: 12px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+        aspect-ratio: 4/5;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        background: #eee;
+    }
+
+    .active-banner-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: opacity 0.4s ease-in-out;
+    }
+
+    .nav-btn {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        background: rgba(255,255,255,0.8);
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        z-index: 10;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    .nav-btn:hover {
+        background: white;
+        transform: translateY(-50%) scale(1.1);
+    }
+
+    .nav-btn.prev { left: 15px; }
+    .nav-btn.next { right: 15px; }
+
+    .banner-dots {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 8px;
+        z-index: 10;
+    }
+
+    .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.5);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .dot.active {
+        background: white;
+        width: 20px;
+        border-radius: 4px;
+    }
+
+    .thumbnail-list {
+        display: flex;
+        gap: 12px;
+        overflow-x: auto;
+        padding-bottom: 5px;
+    }
+
+    .thumb-item {
+        width: 80px;
+        height: 80px;
+        border-radius: 8px;
+        overflow: hidden;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: all 0.2s;
+        flex-shrink: 0;
+    }
+
+    .thumb-item.active {
+        border-color: #d32f2f;
+    }
+
+    .thumb-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
     }
 
     .p-name {
-        font-size: 32px;
-        font-weight: 800;
+        font-family: 'Outfit', sans-serif;
+        font-size: 2.2rem;
+        font-weight: 700;
         color: #1a1a1a;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
+        letter-spacing: -0.5px;
+        line-height: 1.2;
     }
 
     .p-price {
-        font-size: 28px;
+        font-size: 1.8rem;
         font-weight: 700;
         color: #d32f2f;
         margin-bottom: 30px;
+        letter-spacing: -1px;
     }
 
     .option-group {
@@ -435,6 +813,127 @@
         border-color: #2F4858;
     }
 
+    .chip-wrapper {
+        position: relative;
+    }
+
+    .size-tooltip {
+        position: absolute;
+        bottom: 125%;
+        left: 50%;
+        transform: translateX(-50%) translateY(10px);
+        background: #1a1a1a;
+        color: white;
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+        visibility: hidden;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 100;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        pointer-events: none;
+    }
+
+    .size-tooltip::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -6px;
+        border-width: 6px;
+        border-style: solid;
+        border-color: #1a1a1a transparent transparent transparent;
+    }
+
+    .chip-wrapper:hover .size-tooltip {
+        visibility: visible;
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+
+    /* Size Guide Accordion Styles */
+    .size-guide-accordion {
+        margin-top: 20px;
+        border: 1px solid #eee;
+        border-radius: 12px;
+        overflow: hidden;
+        background: white;
+    }
+
+    .accordion-header {
+        padding: 15px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: white;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 14px;
+        color: #333;
+        transition: background 0.2s;
+        border-bottom: 1px solid transparent;
+    }
+
+    .accordion-header:hover {
+        background: #f9f9f9;
+    }
+
+    .accordion-header i {
+        font-size: 12px;
+        color: #999;
+    }
+
+    .accordion-content {
+        padding: 15px 20px 20px;
+        border-top: 1px solid #eee;
+    }
+
+    .size-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        color: #555;
+    }
+
+    .size-table th {
+        background: #f8f9fa;
+        padding: 12px 10px;
+        text-align: center;
+        font-weight: 700;
+        color: #1a1a1a;
+        border-bottom: 1px solid #eee;
+    }
+
+    .size-table td {
+        padding: 12px 10px;
+        text-align: center;
+        border-bottom: 1px solid #f1f1f1;
+    }
+
+    .size-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .size-table tr.highlight td {
+        color: #d32f2f;
+        font-weight: 700;
+        background: #fff5f5;
+    }
+
+    .size-table td:first-child {
+        font-weight: 700;
+        color: #1a1a1a;
+        background: #fafafa;
+    }
+
+    .size-table tr.highlight td:first-child {
+        background: #fff5f5;
+        color: #d32f2f;
+    }
+
     .p-meta {
         margin-bottom: 30px;
         background: #f8f9fa;
@@ -467,11 +966,25 @@
     .value.out-of-stock { color: #d32f2f; }
 
     .p-description h3 {
-        font-size: 16px;
-        font-weight: 800;
+        font-size: 1.1rem;
+        font-weight: 700;
         text-transform: uppercase;
-        margin-bottom: 15px;
-        color: #333;
+        letter-spacing: 1.5px;
+        margin-bottom: 24px;
+        color: #1a1a1a;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-family: 'Outfit', sans-serif;
+    }
+
+    .p-description h3::before {
+        content: "";
+        width: 4px;
+        height: 18px;
+        background: #d32f2f;
+        border-radius: 2px;
+        display: inline-block;
     }
 
     .p-description p {
@@ -546,8 +1059,19 @@
 
     .section-header h2 {
         font-size: 24px;
-        font-weight: 800;
+        font-weight: 700;
         color: #1a1a1a;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .section-header h2::before {
+        content: "";
+        width: 4px;
+        height: 20px;
+        background: #d32f2f;
+        border-radius: 2px;
     }
 
     .avg-rating {
@@ -584,6 +1108,195 @@
     .review-rating { margin-bottom: 12px; color: #ffc107; font-size: 12px; }
     .review-comment { color: #555; line-height: 1.6; }
     .no-reviews { color: #999; text-align: center; padding: 40px; }
+
+    /* ============= REVIEW FORM ============= */
+    .review-form-card {
+        background: linear-gradient(135deg, #f8f9ff, #fff);
+        border: 1px solid #e8edff;
+        border-radius: 20px;
+        padding: 28px;
+        margin-bottom: 32px;
+        box-shadow: 0 4px 20px rgba(79, 70, 229, 0.07);
+    }
+
+    .review-form-card h3 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1e1b4b;
+        margin-bottom: 20px;
+    }
+
+    .star-picker {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+    }
+
+    .star-picker > span:first-child {
+        font-weight: 600;
+        color: #475569;
+        font-size: 0.9rem;
+    }
+
+    .stars-input {
+        display: flex;
+        flex-direction: row-reverse;
+        gap: 4px;
+    }
+
+    .star-opt {
+        font-size: 1.8rem;
+        color: #d1d5db;
+        cursor: pointer;
+        transition: color 0.15s, transform 0.15s;
+        line-height: 1;
+    }
+
+    .stars-input:hover .star-opt { color: #f59e0b; }
+    .star-opt.selected { color: #f59e0b; }
+    .star-opt:hover { transform: scale(1.2); }
+
+    .star-label {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #f59e0b;
+        background: #fffbeb;
+        padding: 4px 12px;
+        border-radius: 20px;
+        border: 1px solid #fde68a;
+    }
+
+    .review-textarea {
+        width: 100%;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 14px 16px;
+        font-size: 0.95rem;
+        color: #334155;
+        background: white;
+        resize: vertical;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        font-family: inherit;
+        line-height: 1.6;
+        box-sizing: border-box;
+    }
+
+    .review-textarea:focus {
+        outline: none;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    .review-error {
+        margin-top: 10px;
+        color: #dc2626;
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .review-success {
+        margin-top: 10px;
+        color: #16a34a;
+        font-size: 0.85rem;
+        font-weight: 600;
+        background: #dcfce7;
+        padding: 10px 14px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .review-form-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 14px;
+        gap: 12px;
+    }
+
+    .char-count { font-size: 0.78rem; color: #94a3b8; }
+
+    .btn-submit-review {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: linear-gradient(135deg, #4f46e5, #6366f1);
+        color: white;
+        border: none;
+        padding: 11px 24px;
+        border-radius: 12px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-submit-review:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-submit-review:disabled { opacity: 0.7; cursor: not-allowed; }
+
+    .login-to-review {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: #f8fafc;
+        border: 1.5px dashed #cbd5e1;
+        border-radius: 16px;
+        padding: 18px 24px;
+        margin-bottom: 24px;
+        color: #64748b;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .login-to-review i { color: #94a3b8; font-size: 1.1rem; }
+    .login-to-review a { color: #4f46e5; font-weight: 700; text-decoration: none; }
+    .login-to-review a:hover { text-decoration: underline; }
+
+    /* ============= REVIEW CARDS ============= */
+    .reviews-list { display: flex; flex-direction: column; gap: 16px; margin-top: 8px; }
+
+    .review-item {
+        display: flex;
+        gap: 16px;
+        background: #fafbff;
+        border: 1px solid #f1f5f9;
+        border-radius: 16px;
+        padding: 20px;
+        transition: box-shadow 0.2s;
+    }
+
+    .review-item:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+
+    .review-avatar {
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #4f46e5, #818cf8);
+        color: white;
+        font-size: 1.1rem;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .review-body { flex: 1; }
+
+    .review-rating .fa-star { font-size: 0.9rem; color: #d1d5db; }
+    .review-rating .fa-star.filled { color: #f59e0b; }
+    .rating-text { font-size: 0.78rem; font-weight: 700; color: #f59e0b; margin-left: 6px; }
 
     .products-grid {
         display: grid;

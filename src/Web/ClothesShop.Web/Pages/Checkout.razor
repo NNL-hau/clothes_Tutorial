@@ -500,8 +500,15 @@
                         {
                             successMessage = "Thanh toán VNPay thành công!";
                             
+                            // Cập nhật trạng thái đơn hàng sang Chờ xử lý (Pending)
+                            await OrderApiService.UpdateOrderStatusAsync(transaction.OrderId, "Pending");
+                            
                             // Lưu snapshot giỏ hàng TRƯỚC khi xóa, để trừ tồn kho chính xác
                             var basketSnapshot = await BasketService.GetBasketAsync();
+                            if (basketSnapshot != null)
+                            {
+                                basketSnapshot.Items = basketSnapshot.Items.Where(i => i.IsSelected).ToList();
+                            }
                             await BasketService.ClearBasketAsync();
                             await DeductStockFromBasketItems(basketSnapshot);
                             await EmailService.SendOrderConfirmationEmailAsync(checkoutForm.Email, checkoutForm.FullName, transaction.OrderId.ToString(), transaction.Amount);
@@ -545,6 +552,11 @@
         errorMessage = string.Empty;
 
         basket = await BasketService.GetBasketAsync();
+        if (basket != null)
+        {
+            // Only keep selected items for checkout
+            basket.Items = basket.Items.Where(i => i.IsSelected).ToList();
+        }
         
         var user = AuthService.CurrentUser;
         if (user != null)
@@ -571,11 +583,13 @@
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(checkoutForm.FullName) || string.IsNullOrWhiteSpace(checkoutForm.PhoneNumber))
+        if (string.IsNullOrWhiteSpace(checkoutForm.FullName) || string.IsNullOrWhiteSpace(checkoutForm.PhoneNumber) || string.IsNullOrWhiteSpace(checkoutForm.Email))
         {
-            errorMessage = "Vui lòng điền đầy đủ Họ tên và Số điện thoại.";
+            errorMessage = "Vui lòng điền đầy đủ thông tin: Họ tên, Số điện thoại và Email.";
             return;
         }
+
+        Console.WriteLine($"[Checkout] Starting checkout for {checkoutForm.Email}. Method: {selectedMethod}");
 
         isProcessing = true;
         errorMessage = string.Empty;
@@ -585,7 +599,7 @@
         {
             // 1. Tạo Đơn hàng (Order)
             var orderRequest = new CreateOrderRequest(
-                UserName: checkoutForm.Email,
+                UserName: !string.IsNullOrEmpty(checkoutForm.Email) ? checkoutForm.Email : checkoutForm.FullName,
                 TotalPrice: basket.TotalPrice,
                 FullName: checkoutForm.FullName, 
                 PhoneNumber: checkoutForm.PhoneNumber,
@@ -631,7 +645,7 @@
             // 2. Tạo giao dịch thanh toán
             var transactionRequest = new CreateTransactionRequest(
                 OrderId: createdOrder.Id,
-                UserName: checkoutForm.Email,
+                UserName: !string.IsNullOrEmpty(checkoutForm.Email) ? checkoutForm.Email : checkoutForm.FullName,
                 Amount: basket.TotalPrice,
                 PaymentMethod: selectedMethod,
                 FullName: checkoutForm.FullName,
@@ -663,6 +677,10 @@
             
             // COD và phương thức khác: trừ kho trước khi xóa giỏ
             var basketSnapshot = await BasketService.GetBasketAsync();
+            if (basketSnapshot != null)
+            {
+                basketSnapshot.Items = basketSnapshot.Items.Where(i => i.IsSelected).ToList();
+            }
             await BasketService.ClearBasketAsync();
             await DeductStockFromBasketItems(basketSnapshot);
             await EmailService.SendOrderConfirmationEmailAsync(checkoutForm.Email, checkoutForm.FullName, createdOrder.Id.ToString(), basketSnapshot.TotalPrice);

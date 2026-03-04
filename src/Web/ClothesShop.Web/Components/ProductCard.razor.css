@@ -68,8 +68,8 @@
 
 .product-name {
     font-size: 15px;
-    font-weight: 500;
-    color: #333;
+    font-weight: 600;
+    color: #1a1a1a;
     margin: 0 0 10px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -269,7 +269,7 @@
 
 .detail-name {
     font-size: 36px;
-    font-weight: 800;
+    font-weight: 700;
     color: #1a1a1a;
     margin-bottom: 10px;
     line-height: 1.2;
@@ -279,8 +279,15 @@
     font-size: 32px;
     font-weight: 700;
     color: #d32f2f;
-    margin-bottom: 30px;
+    margin-bottom: 20px;
 }
+
+.sold-count-mini {
+    font-size: 0.8rem;
+    color: #666;
+    margin-left: auto;
+}
+
 
 .detail-meta {
     margin-bottom: 30px;

@@ -21,7 +21,7 @@ namespace Catalog.API.Controllers
         public async Task<ActionResult<IEnumerable<ProductDto>>> GetProducts()
         {
             return await _context.Products
-                .Select(p => new ProductDto(p.Id, p.Name, p.Description, p.Price, p.ImageUrl, p.CategoryId, p.StockQuantity, p.Colors, p.Sizes, p.CreatedAt))
+                .Select(p => new ProductDto(p.Id, p.Name, p.Description, p.Price, p.ImageUrl, p.CategoryId, p.StockQuantity, p.SoldQuantity, p.Colors, p.Sizes, p.CreatedAt))
                 .ToListAsync();
         }
 
@@ -31,7 +31,7 @@ namespace Catalog.API.Controllers
             var p = await _context.Products.FindAsync(id);
             if (p == null) return NotFound();
 
-            return new ProductDto(p.Id, p.Name, p.Description, p.Price, p.ImageUrl, p.CategoryId, p.StockQuantity, p.Colors, p.Sizes, p.CreatedAt);
+            return new ProductDto(p.Id, p.Name, p.Description, p.Price, p.ImageUrl, p.CategoryId, p.StockQuantity, p.SoldQuantity, p.Colors, p.Sizes, p.CreatedAt);
         }
 
         [HttpGet("{id}/related")]
@@ -43,7 +43,7 @@ namespace Catalog.API.Controllers
             return await _context.Products
                 .Where(p => p.CategoryId == product.CategoryId && p.Id != id)
                 .Take(4)
-                .Select(p => new ProductDto(p.Id, p.Name, p.Description, p.Price, p.ImageUrl, p.CategoryId, p.StockQuantity, p.Colors, p.Sizes, p.CreatedAt))
+                .Select(p => new ProductDto(p.Id, p.Name, p.Description, p.Price, p.ImageUrl, p.CategoryId, p.StockQuantity, p.SoldQuantity, p.Colors, p.Sizes, p.CreatedAt))
                 .ToListAsync();
         }
 
@@ -66,7 +66,7 @@ namespace Catalog.API.Controllers
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, 
-                new ProductDto(product.Id, product.Name, product.Description, product.Price, product.ImageUrl, product.CategoryId, product.StockQuantity, product.Colors, product.Sizes, product.CreatedAt));
+                new ProductDto(product.Id, product.Name, product.Description, product.Price, product.ImageUrl, product.CategoryId, product.StockQuantity, product.SoldQuantity, product.Colors, product.Sizes, product.CreatedAt));
         }
 
         [HttpPut("{id}")]
@@ -99,9 +99,13 @@ namespace Catalog.API.Controllers
                 return BadRequest("Not enough stock available.");
             }
 
+            Console.WriteLine($"[Catalog.API] Deducting stock for {id}. Old Stock: {product.StockQuantity}, Old Sold: {product.SoldQuantity}, Qty: {quantity}");
             product.StockQuantity -= quantity;
+            product.SoldQuantity += quantity;
             await _context.SaveChangesAsync();
+            Console.WriteLine($"[Catalog.API] Deducted stock for {id}. New Stock: {product.StockQuantity}, New Sold: {product.SoldQuantity}");
             return NoContent();
+
         }
 
         [HttpDelete("{id}")]

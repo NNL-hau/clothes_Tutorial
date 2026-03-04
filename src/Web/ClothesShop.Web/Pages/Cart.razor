@@ -1,4 +1,5 @@
 @page "/cart"
+@using ClothesShop.Web.Helpers
 @inject IBasketService BasketService
 @inject NavigationManager Navigation
 @implements IDisposable
@@ -29,6 +30,9 @@
         <div class="cart-content">
             <div class="cart-items-list">
                 <div class="list-header">
+                    <div class="select-all-container">
+                        <input type="checkbox" checked="@(basket.Items.All(i => i.IsSelected))" @onchange="ToggleAll" id="selectAll" />
+                    </div>
                     <span>Sản phẩm</span>
                     <span>Đơn giá</span>
                     <span>Số lượng</span>
@@ -38,9 +42,12 @@
 
                 @foreach (var item in basket.Items)
                 {
-                    <div class="cart-item">
+                    <div class="cart-item @(item.IsSelected ? "" : "unselected")">
+                        <div class="item-selection">
+                            <input type="checkbox" checked="@item.IsSelected" @onchange="@(e => ToggleItem(item, e.Value))" />
+                        </div>
                         <div class="item-info">
-                            <img src="@(string.IsNullOrEmpty(item.ImageUrl) ? "/images/placeholder-product.jpg" : item.ImageUrl)" alt="@item.ProductName" />
+                            <img src="@ProductHelpers.GetFirstImageUrl(item.ImageUrl)" alt="@item.ProductName" />
                             <div class="item-details">
                                 <span class="item-name">@item.ProductName</span>
                                 <div class="item-options">
@@ -79,7 +86,7 @@
                         <div class="item-total">@((item.Price * item.Quantity).ToString("N0")) đ</div>
 
                         <div class="item-remove">
-                            <button class="remove-btn" @onclick="() => RemoveItem(item.ProductId)">
+                            <button class="remove-btn" @onclick="() => RemoveItem(item.ProductId, item.SelectedColor, item.SelectedSize)">
                                 <i class="fa-solid fa-trash-can"></i>
                             </button>
                         </div>
@@ -111,7 +118,7 @@
                     @foreach (var product in relatedProducts)
                     {
                         <div class="related-product-card" @onclick="() => NavigateToProduct(product.Id)">
-                            <img src="@(string.IsNullOrEmpty(product.ImageUrl) ? "/images/placeholder-product.jpg" : product.ImageUrl)" alt="@product.Name" />
+                            <img src="@ProductHelpers.GetFirstImageUrl(product.ImageUrl)" alt="@product.Name" />
                             <div class="related-product-info">
                                 <span class="p-name">@product.Name</span>
                                 <span class="p-price">@product.Price.ToString("N0") đ</span>
@@ -198,9 +205,25 @@
         await BasketService.UpdateOptionsAsync(item.ProductId, item.SelectedColor, item.SelectedSize, newColor, newSize);
     }
 
-    private async Task RemoveItem(Guid productId)
+    private async Task RemoveItem(Guid productId, string? color, string? size)
     {
-        await BasketService.RemoveFromBasketAsync(productId);
+        await BasketService.RemoveFromBasketAsync(productId, color, size);
+    }
+
+    private async Task ToggleItem(BasketItem item, object? value)
+    {
+        if (value is bool isSelected)
+        {
+            await BasketService.ToggleSelectionAsync(item.ProductId, item.SelectedColor, item.SelectedSize, isSelected);
+        }
+    }
+
+    private async Task ToggleAll(ChangeEventArgs e)
+    {
+        if (e.Value is bool isSelected)
+        {
+            await BasketService.ToggleAllSelectionAsync(isSelected);
+        }
     }
 
     private void GoHome() => Navigation.NavigateTo("/");

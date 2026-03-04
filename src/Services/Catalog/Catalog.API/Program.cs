@@ -89,7 +89,25 @@ using (var scope = app.Services.CreateScope())
                         Console.WriteLine("[Catalog.API] Added Sizes column to Products table.");
                     }
                 }
+
+                // Check & add SoldQuantity column
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_SCHEMA = DATABASE()
+                          AND TABLE_NAME = 'Products'
+                          AND COLUMN_NAME = 'SoldQuantity'";
+                    var count = Convert.ToInt32(cmd.ExecuteScalar());
+                    if (count == 0)
+                    {
+                        cmd.CommandText = "ALTER TABLE Products ADD COLUMN SoldQuantity INT DEFAULT 0 NOT NULL";
+                        cmd.ExecuteNonQuery();
+                        Console.WriteLine("[Catalog.API] Added SoldQuantity column to Products table.");
+                    }
+                }
             }
+
             finally
             {
                 conn.Close();

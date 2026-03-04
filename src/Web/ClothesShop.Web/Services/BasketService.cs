@@ -89,11 +89,13 @@ namespace ClothesShop.Web.Services
             NotifyStateChanged();
         }
 
-        public async Task RemoveFromBasketAsync(Guid productId)
+        public async Task RemoveFromBasketAsync(Guid productId, string? color = null, string? size = null)
         {
-            // Remove all items with this product ID
+            // Remove only the specific item matching product ID and options
             var basket = await GetBasketAsync();
-            basket.Items.RemoveAll(i => i.ProductId == productId);
+            basket.Items.RemoveAll(i => i.ProductId == productId && 
+                                       (i.SelectedColor == color) && 
+                                       (i.SelectedSize == size));
             
             var key = GetBasketKey();
             await _localStorage.SetItemAsync(key, basket);
@@ -164,6 +166,33 @@ namespace ClothesShop.Web.Services
                 await _localStorage.SetItemAsync(key, basket);
                 NotifyStateChanged();
             }
+        }
+
+        public async Task ToggleSelectionAsync(Guid productId, string? color, string? size, bool isSelected)
+        {
+            var basket = await GetBasketAsync();
+            var item = basket.Items.FirstOrDefault(i => i.ProductId == productId && i.SelectedColor == color && i.SelectedSize == size);
+
+            if (item != null)
+            {
+                item.IsSelected = isSelected;
+                var key = GetBasketKey();
+                await _localStorage.SetItemAsync(key, basket);
+                NotifyStateChanged();
+            }
+        }
+
+        public async Task ToggleAllSelectionAsync(bool isSelected)
+        {
+            var basket = await GetBasketAsync();
+            foreach (var item in basket.Items)
+            {
+                item.IsSelected = isSelected;
+            }
+
+            var key = GetBasketKey();
+            await _localStorage.SetItemAsync(key, basket);
+            NotifyStateChanged();
         }
 
         private void NotifyStateChanged() => OnChange?.Invoke();

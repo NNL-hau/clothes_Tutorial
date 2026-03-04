@@ -5,6 +5,7 @@
 @inject IOrderApiService OrderService
 @inject IUserApiService UserService
 @using ClothesShop.Web.Models
+@using ClothesShop.Web.Helpers
 
 <div class="admin-search">
     <div class="mb-5">
@@ -32,7 +33,7 @@
                                 @foreach (var p in products)
                                 {
                                     <tr>
-                                        <td style="width: 50px;"><img src="@p.ImageUrl" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;" /></td>
+                                        <td style="width: 50px;"><img src="@ProductHelpers.GetFirstImageUrl(p.ImageUrl)" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover;" /></td>
                                         <td><strong>@p.Name</strong></td>
                                         <td>@p.Price.ToString("N0")₫</td>
                                         <td><span class="badge @(p.StockQuantity > 0 ? "bg-success" : "bg-danger")">@(p.StockQuantity > 0 ? $"Còn {p.StockQuantity}" : "Hết hàng")</span></td>

@@ -41,7 +41,7 @@
                 <table class="table-fashion">
                     <thead>
                         <tr>
-                            <th>Người dùng</th>
+                             <th>Tên đăng nhập</th>
                             <th>Email</th>
                             <th>Vai trò</th>
                             <th>Ngày tham gia</th>
@@ -53,11 +53,11 @@
                         {
                             <tr>
                                 <td>
-                                    <div class="d-flex align-items-center gap-3">
+                                     <div class="d-flex align-items-center gap-3">
                                         <div class="avatar-premium" style="background: @GetAvatarBg(u.Role);">
-                                            @u.FullName.Substring(0, 1)
+                                            @(string.IsNullOrEmpty(u.Email) ? "?" : u.Email.Substring(0, 1).ToUpper())
                                         </div>
-                                        <div style="font-weight: 700; color: var(--text-main);">@u.FullName</div>
+                                        <div style="font-weight: 700; color: var(--text-main);">@u.Email</div>
                                     </div>
                                 </td>
                                 <td><span style="color: var(--text-muted);">@u.Email</span></td>

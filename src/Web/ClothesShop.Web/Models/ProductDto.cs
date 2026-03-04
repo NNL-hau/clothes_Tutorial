@@ -8,9 +8,11 @@ namespace ClothesShop.Web.Models
         string? ImageUrl,
         Guid CategoryId,
         int StockQuantity,
+        int SoldQuantity,
         string? Colors,
         string? Sizes,
         DateTime CreatedAt
+
     );
 
     public record CreateProductDto(

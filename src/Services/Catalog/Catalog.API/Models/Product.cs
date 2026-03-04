@@ -22,6 +22,8 @@ namespace Catalog.API.Models
         public virtual Category Category { get; set; } = null!;
         
         public int StockQuantity { get; set; }
+        public int SoldQuantity { get; set; }
+
         
         public string? Colors { get; set; } // e.g., "Đen, Trắng, Xanh"
         public string? Sizes { get; set; }  // e.g., "S, M, L, XL"

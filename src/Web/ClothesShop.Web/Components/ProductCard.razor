@@ -1,12 +1,13 @@
 @using ClothesShop.Web.Models
 @using ClothesShop.Web.Services
+@using ClothesShop.Web.Helpers
 @inject IBasketService BasketService
 @inject IAuthService AuthService
 @inject NavigationManager Navigation
 
 <div class="product-card">
     <div class="product-image" @onclick="OpenDetail">
-        <img src="@(string.IsNullOrEmpty(Product.ImageUrl) ? "/images/placeholder-product.jpg" : Product.ImageUrl)" 
+        <img src="@ProductHelpers.GetFirstImageUrl(Product.ImageUrl)" 
              alt="@Product.Name" />
         @if (Product.StockQuantity == 0)
         {
@@ -34,6 +35,7 @@
         
         <div class="product-price">
             <span class="current-price">@Product.Price.ToString("N0") đ</span>
+            <span class="sold-count-mini">Đã bán: @Product.SoldQuantity</span>
         </div>
     </div>
 </div>
@@ -46,7 +48,7 @@
             
             <div class="detail-container">
                 <div class="detail-image">
-                    <img src="@(string.IsNullOrEmpty(Product.ImageUrl) ? "/images/placeholder-product.jpg" : Product.ImageUrl)" alt="@Product.Name" />
+                    <img src="@ProductHelpers.GetFirstImageUrl(Product.ImageUrl)" alt="@Product.Name" />
                 </div>
                 
                 <div class="detail-info">
@@ -63,6 +65,10 @@
                         <div class="meta-item">
                             <span class="meta-label">Số lượng tồn:</span>
                             <span class="meta-value">@Product.StockQuantity</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Đã bán:</span>
+                            <span class="meta-value">@Product.SoldQuantity</span>
                         </div>
                     </div>
                     

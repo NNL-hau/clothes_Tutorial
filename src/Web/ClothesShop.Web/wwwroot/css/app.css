@@ -1,8 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
 
 html,
 body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: 'Outfit', 'Inter', 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.6;
+    color: #2d3436;
 }
 
 h1:focus {
@@ -172,8 +176,15 @@ code {
     border-bottom: 1px solid transparent;
 }
 
-.table-fashion tr td:first-child { border-radius: 10px 0 0 10px; border-left: 1px solid transparent; }
-.table-fashion tr td:last-child { border-radius: 0 10px 10px 0; border-right: 1px solid transparent; }
+.table-fashion tr td:first-child {
+    border-radius: 10px 0 0 10px;
+    border-left: 1px solid transparent;
+}
+
+.table-fashion tr td:last-child {
+    border-radius: 0 10px 10px 0;
+    border-right: 1px solid transparent;
+}
 
 /* Modal Styles */
 .modal-overlay {
@@ -203,8 +214,15 @@ code {
 }
 
 @keyframes slideIn {
-    from { transform: translateY(-30px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from {
+        transform: translateY(-30px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 .modal-header-custom {
@@ -216,16 +234,35 @@ code {
     align-items: center;
 }
 
-.modal-header-custom h4 { margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-main); }
-.btn-close-custom { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); }
+.modal-header-custom h4 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
 
-.modal-body-custom { 
-    padding: 25px; 
+.btn-close-custom {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-muted);
+}
+
+.modal-body-custom {
+    padding: 25px;
     overflow-y: auto;
     flex: 1;
 }
 
-.form-label-custom { display: block; margin-bottom: 8px; font-weight: 600; font-size: 0.9rem; color: var(--text-main); }
+.form-label-custom {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-main);
+}
+
 .form-control-custom {
     width: 100%;
     padding: 12px;
@@ -234,7 +271,12 @@ code {
     font-size: 0.95rem;
     transition: all 0.3s;
 }
-.form-control-custom:focus { border-color: var(--primary-fashion) !important; outline: none; box-shadow: 0 0 0 3px rgba(78, 115, 223, 0.1); }
+
+.form-control-custom:focus {
+    border-color: var(--primary-fashion) !important;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(78, 115, 223, 0.1);
+}
 
 .modal-footer-custom {
     padding: 20px;
@@ -244,7 +286,8 @@ code {
     gap: 10px;
 }
 
-.btn-primary-fashion, .btn-primary-custom {
+.btn-primary-fashion,
+.btn-primary-custom {
     background: var(--primary-fashion);
     color: white;
     border: none;
@@ -257,8 +300,10 @@ code {
     justify-content: center;
     text-decoration: none;
 }
-.btn-primary-fashion:hover, .btn-primary-custom:hover { 
-    background: var(--primary-dark); 
+
+.btn-primary-fashion:hover,
+.btn-primary-custom:hover {
+    background: var(--primary-dark);
     transform: translateY(-2px);
     color: white;
 }
@@ -281,7 +326,12 @@ code {
     font-weight: 600;
 }
 
-.action-buttons { display: flex; gap: 8px; justify-content: center; }
+.action-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
 .btn-action {
     width: 35px;
     height: 35px;
@@ -293,6 +343,17 @@ code {
     transition: all 0.2s;
     cursor: pointer;
 }
-.btn-action.edit { background: rgba(78, 115, 223, 0.1); color: var(--primary-fashion); }
-.btn-action.delete { background: rgba(231, 74, 59, 0.1); color: var(--danger-fashion); }
-.btn-action:hover { transform: scale(1.1); }
+
+.btn-action.edit {
+    background: rgba(78, 115, 223, 0.1);
+    color: var(--primary-fashion);
+}
+
+.btn-action.delete {
+    background: rgba(231, 74, 59, 0.1);
+    color: var(--danger-fashion);
+}
+
+.btn-action:hover {
+    transform: scale(1.1);
+}
