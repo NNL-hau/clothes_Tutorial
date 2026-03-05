@@ -78,3 +78,4 @@ logs/
 appsettings.Development.json
 *.pfx
 *.key
+.env

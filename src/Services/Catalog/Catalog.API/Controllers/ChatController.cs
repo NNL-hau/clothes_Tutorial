@@ -14,12 +14,18 @@ namespace Catalog.API.Controllers
         private readonly CatalogDbContext _context;
         private readonly IConfiguration _configuration;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly ILogger<ChatController> _logger;
 
-        public ChatController(CatalogDbContext context, IConfiguration configuration, IHttpClientFactory httpClientFactory)
+        public ChatController(
+            CatalogDbContext context,
+            IConfiguration configuration,
+            IHttpClientFactory httpClientFactory,
+            ILogger<ChatController> logger)
         {
             _context = context;
             _configuration = configuration;
             _httpClientFactory = httpClientFactory;
+            _logger = logger;
         }
 
         [HttpPost]
@@ -80,8 +86,24 @@ namespace Catalog.API.Controllers
             contextBuilder.AppendLine("\nHướng dẫn: Sử dụng dữ liệu trên để trả lời một cách chi tiết, chuyên nghiệp và thân thiện bằng TIẾNG VIỆT. Nếu có nhiều sản phẩm phù hợp, hãy gợi ý một vài mẫu. Nếu nhắc đến giá, hãy sử dụng mức giá chính xác đã cung cấp. Nếu không thấy sản phẩm, hãy gợi ý khách hàng xem các danh mục sản phẩm của chúng tôi.");
 
             // 3. Call Gemini API
-            var apiKey = "AIzaSyCOOJvnV5YUVqlq9CxKQIow_vVowGJEthU"; // Fresh unused API key
-            var apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}";
+            // NOTE: API key is read from configuration for security.
+            // Make sure you have GeminiSettings:ApiKey configured via appsettings or environment variables.
+            var environment = _configuration["ASPNETCORE_ENVIRONMENT"] ?? "Unknown";
+            var apiKey = _configuration["GeminiSettings:ApiKey"];
+
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                _logger.LogError(
+                    "Gemini API key missing. Environment={Environment}. " +
+                    "Check appsettings.Development.json or environment variables for GeminiSettings:ApiKey.",
+                    environment);
+
+                return StatusCode(500, "Gemini API key is not configured. Please set GeminiSettings:ApiKey.");
+            }
+
+            // Use the Gemini 2.5 Flash model (your quota screenshot shows limits for this model)
+            var modelName = "gemini-2.5-flash";
+            var apiUrl = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={apiKey}";
 
             var geminiRequest = new
             {

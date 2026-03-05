@@ -10,10 +10,17 @@
     </div>
 }
 
-<div class="chat-container @(isOpen ? "" : "hidden")">
+<div class="chat-container @(isOpen ? "" : "hidden") @(isMaximized ? "chat-maximized" : "")">
     <div class="chat-header">
         <h3>Trợ lý ClothesShop</h3>
-        <button class="chat-close-btn" @onclick="ToggleChat"><i class='bx bx-chevron-down'></i></button>
+        <div class="chat-header-actions">
+            <button class="chat-maximize-btn" @onclick="ToggleMaximize">
+                <i class='bx @(isMaximized ? "bx-exit-fullscreen" : "bx-fullscreen")'></i>
+            </button>
+            <button class="chat-close-btn" @onclick="ToggleChat">
+                <i class='bx bx-chevron-down'></i>
+            </button>
+        </div>
     </div>
 
     <div class="chat-messages" id="chatMessages">
@@ -85,6 +92,7 @@
 
 @code {
     private bool isOpen = false;
+    private bool isMaximized = false;
     private string userInput = "";
     private bool isTyping = false;
     private List<ChatMessage> messages = new();
@@ -92,6 +100,18 @@
     private void ToggleChat()
     {
         isOpen = !isOpen;
+
+        // Khi mở lại, giữ trạng thái phóng to hiện tại
+    }
+
+    private void ToggleMaximize()
+    {
+        if (!isOpen)
+        {
+            isOpen = true;
+        }
+
+        isMaximized = !isMaximized;
     }
 
     private async Task SendMessage()
