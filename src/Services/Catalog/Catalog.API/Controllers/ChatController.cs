@@ -28,6 +28,56 @@ namespace Catalog.API.Controllers
             _logger = logger;
         }
 
+        [HttpGet("suggestions")]
+        public async Task<ActionResult<IEnumerable<SuggestionDto>>> GetSuggestions()
+        {
+            var suggestions = new List<SuggestionDto>();
+
+            try
+            {
+                // 1. Fetch top 2 best selling products
+                var topProducts = await _context.Products
+                    .OrderByDescending(p => p.SoldQuantity)
+                    .Take(2)
+                    .ToListAsync();
+
+                foreach (var p in topProducts)
+                {
+                    suggestions.Add(new SuggestionDto($"Cho tôi xem {p.Name}", "bx-star"));
+                }
+
+                // 2. Fetch 2 random categories
+                var categories = await _context.Categories
+                    .OrderBy(c => Guid.NewGuid())
+                    .Take(2)
+                    .ToListAsync();
+
+                foreach (var c in categories)
+                {
+                    suggestions.Add(new SuggestionDto($"Sản phẩm thuộc mục {c.Name}", "bx-category"));
+                }
+
+                // 3. Fallback if empty
+                if (!suggestions.Any())
+                {
+                    suggestions.Add(new SuggestionDto("Xu hướng thời trang mới nhất", "bx-trending-up"));
+                    suggestions.Add(new SuggestionDto("Các sản phẩm đang giảm giá", "bx-purchase-tag-alt"));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching chat suggestions");
+                // Return default suggestions on error
+                return Ok(new List<SuggestionDto>
+                {
+                    new("Cho tôi xem áo sơ mi", "bx-shirt"),
+                    new("Hàng mới về", "bx-news")
+                });
+            }
+
+            return Ok(suggestions);
+        }
+
         [HttpPost]
         public async Task<ActionResult<ChatResponse>> PostChat([FromBody] ChatRequest request)
         {
@@ -36,54 +86,72 @@ namespace Catalog.API.Controllers
                 return BadRequest("Message cannot be empty.");
             }
 
-            // 1. Fetch comprehensive data for the AI context
+            // 1. Always load full catalog from DB so AI has complete context to reason from
             List<Catalog.API.Models.Category> categories = new();
-            List<Catalog.API.Models.Product> relevantProducts = new();
+            List<Catalog.API.Models.Product> allProducts = new();
 
             try 
             {
-                // Fetch all categories to give the AI an idea of the shop structure
                 categories = await _context.Categories.ToListAsync();
                 
-                // Fetch products matching the search OR just fetch a slice of featured products if search is broad
-                var searchTerm = request.Message.ToLower();
-                relevantProducts = await _context.Products
+                // Load ALL products (with a reasonable cap of 100) so Gemini can reason
+                // about the full inventory without being limited by keyword matching.
+                allProducts = await _context.Products
                     .Include(p => p.Category)
-                    .Where(p => p.Name.ToLower().Contains(searchTerm) || 
-                                (p.Description != null && p.Description.ToLower().Contains(searchTerm)) ||
-                                p.Category.Name.ToLower().Contains(searchTerm))
-                    .Take(20) // Increased from 5 to 20 for better "read everything" feel
+                    .Where(p => p.StockQuantity > 0) // only in-stock products
+                    .OrderByDescending(p => p.SoldQuantity) // put best-sellers first
+                    .Take(100)
                     .ToListAsync();
             }
             catch (Exception ex)
             {
-                // Log the error (simplified for now)
                 Console.WriteLine($"Database error: {ex.Message}");
-                // We proceed with empty lists if DB fails, so AI can at least respond generally
             }
 
-            // 2. Build the context for Gemini
+            // 2. Build rich context for Gemini
             var contextBuilder = new StringBuilder();
-            contextBuilder.AppendLine("Bạn là chuyên gia tư vấn thời trang am hiểu cho cửa hàng ClothesShop.");
-            if (!string.IsNullOrEmpty(request.Username))
-            {
-                contextBuilder.AppendLine($"Khách hàng tên là: {request.Username}. Hãy chào và xưng hô thân thiện.");
-            }
-            contextBuilder.AppendLine("Các danh mục sản phẩm: " + string.Join(", ", categories.Select(c => c.Name)));
+            contextBuilder.AppendLine("Bạn là chuyên gia tư vấn thời trang của cửa hàng ClothesShop. Bạn có quyền truy cập toàn bộ dữ liệu kho hàng thực tế. Hãy luôn tư vấn dựa trên dữ liệu thực bên dưới.");
             
-            if (relevantProducts.Any())
+            if (!string.IsNullOrEmpty(request.Username))
+                contextBuilder.AppendLine($"Khách hàng tên là: {request.Username}. Hãy xưng hô thân thiện.");
+
+            // --- DANH MỤC ---
+            contextBuilder.AppendLine($"\n=== DANH MỤC SẢN PHẨM ({categories.Count} danh mục) ===");
+            contextBuilder.AppendLine(string.Join(", ", categories.Select(c => c.Name)));
+
+            // --- TOÀN BỘ SẢN PHẨM TRONG KHO ---
+            contextBuilder.AppendLine($"\n=== DANH SÁCH SẢN PHẨM TRONG KHO ({allProducts.Count} sản phẩm) ===");
+            if (allProducts.Any())
             {
-                contextBuilder.AppendLine("\nCác sản phẩm tiêu biểu/liên quan trong cửa hàng:");
-                foreach (var product in relevantProducts)
+                foreach (var product in allProducts)
                 {
-                    contextBuilder.AppendLine($"- {product.Name} ({product.Category.Name}): {product.Price:C}. {product.Description}");
+                    contextBuilder.AppendLine(
+                        $"• [{product.Category.Name}] {product.Name} | Giá: {product.Price:N0}đ | Tồn: {product.StockQuantity} | Đã bán: {product.SoldQuantity} | Màu: {product.Colors} | Size: {product.Sizes} | Mô tả: {product.Description}");
                 }
             }
             else
             {
-                contextBuilder.AppendLine("\nTôi không tìm thấy sản phẩm cụ thể cho yêu cầu này, nhưng chúng tôi có nhiều mặt hàng thời trang đa dạng trong các danh mục trên.");
+                contextBuilder.AppendLine("(Hiện chưa có sản phẩm trong kho)");
             }
-            contextBuilder.AppendLine("\nHướng dẫn: Sử dụng dữ liệu trên để trả lời một cách chi tiết, chuyên nghiệp và thân thiện bằng TIẾNG VIỆT. Nếu có nhiều sản phẩm phù hợp, hãy gợi ý một vài mẫu. Nếu nhắc đến giá, hãy sử dụng mức giá chính xác đã cung cấp. Nếu không thấy sản phẩm, hãy gợi ý khách hàng xem các danh mục sản phẩm của chúng tôi.");
+
+            // --- THÔNG TIN CÁ NHÂN KHÁCH HÀNG ---
+            contextBuilder.AppendLine("\n=== THÔNG TIN CÁ NHÂN KHÁCH HÀNG ===");
+            if (!string.IsNullOrEmpty(request.UserProfile))
+                contextBuilder.AppendLine($"Hồ sơ: {request.UserProfile}");
+            if (!string.IsNullOrEmpty(request.BasketContext))
+                contextBuilder.AppendLine($"Giỏ hàng hiện tại: {request.BasketContext}");
+            if (!string.IsNullOrEmpty(request.OrderContext))
+                contextBuilder.AppendLine($"Lịch sử đơn hàng gần đây: {request.OrderContext}");
+
+            // --- QUY TẮC TRẢ LỜI ---
+            contextBuilder.AppendLine(@"
+=== QUY TẮC BẮT BUỘC ===
+1. Luôn dựa vào danh sách sản phẩm thực tế ở trên để đưa ra gợi ý cụ thể (tên, giá, màu sắc, size).
+2. Khi khách hỏi 'gợi ý', 'tôi nên mua gì', hãy chọn 3-5 sản phẩm phù hợp nhất từ danh sách và trả lời cụ thể.
+3. Khi khách hỏi về giỏ hàng/đơn hàng/thông tin cá nhân, dùng phần THÔNG TIN CÁ NHÂN.
+4. TUYỆT ĐỐI không được bịa tên sản phẩm, giá hay thông tin không có trong dữ liệu trên.
+5. Trả lời bằng TIẾNG VIỆT, thân thiện, chuyên nghiệp và kèm chi tiết giá cả.");
+
 
             // 3. Call Gemini API
             // NOTE: API key is read from configuration for security.

@@ -2,6 +2,8 @@
 @inject IJSRuntime JS
 @inject IChatApiService ChatApiService
 @inject IAuthService authService
+@inject IBasketService basketService
+@inject IOrderApiService orderApiService
 
 @if (!isOpen)
 {
@@ -32,12 +34,25 @@
                 <p style="color: var(--chat-text-dim)">Trợ lý thời trang thông minh của bạn. Hãy hỏi tôi về bộ sưu tập, giá cả hoặc gợi ý phối đồ!</p>
                 
                 <div class="suggestions-grid">
-                    @foreach (var suggestion in suggestions)
+                    @if (isLoadingSuggestions)
                     {
-                        <div class="suggestion-card" @onclick="() => UseSuggestion(suggestion.Text)">
-                            <p>@suggestion.Text</p>
-                            <i class='bx @suggestion.Icon'></i>
-                        </div>
+                        @for (int i = 0; i < 4; i++)
+                        {
+                            <div class="suggestion-card skeleton-suggestion">
+                                <div class="skeleton-line" style="width: 80%"></div>
+                                <div class="skeleton-icon"></div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        @foreach (var suggestion in suggestions)
+                        {
+                            <div class="suggestion-card" @onclick="() => UseSuggestion(suggestion.Text)">
+                                <p>@suggestion.Text</p>
+                                <i class='bx @suggestion.Icon'></i>
+                            </div>
+                        }
                     }
                 </div>
             </div>
@@ -104,6 +119,20 @@
         // Khi mở lại, giữ trạng thái phóng to hiện tại
     }
 
+    private bool isLoadingSuggestions = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSuggestions();
+    }
+
+    private async Task LoadSuggestions()
+    {
+        isLoadingSuggestions = true;
+        suggestions = await ChatApiService.GetSuggestions();
+        isLoadingSuggestions = false;
+    }
+
     private void ToggleMaximize()
     {
         if (!isOpen)
@@ -126,7 +155,33 @@
         await ScrollToBottom();
 
         var currentUser = await authService.GetCurrentUserAsync();
-        var response = await ChatApiService.GetChatResponse(userMsg, currentUser?.FullName);
+        
+        // 1. Gather Basket Context
+        string basketCtx = "";
+        try {
+            var basket = await basketService.GetBasketAsync();
+            if (basket.Items.Any()) {
+                basketCtx = string.Join("; ", basket.Items.Select(i => $"{i.Quantity}x {i.ProductName} ({i.SelectedColor}, {i.SelectedSize})"));
+            }
+        } catch {}
+
+        // 2. Gather Order Context
+        string orderCtx = "";
+        try {
+            var orders = await orderApiService.GetOrdersAsync();
+            if (orders.Any()) {
+                var latest = orders.OrderByDescending(o => o.CreatedAt).Take(3);
+                orderCtx = string.Join(" | ", latest.Select(o => $"Đơn {o.Id.ToString().Substring(0,8)}: {o.OrderStatus}, {o.TotalPrice:C}"));
+            }
+        } catch {}
+
+        // 3. Gather Profile Context
+        string profileCtx = "";
+        if (currentUser != null) {
+            profileCtx = $"Tên: {currentUser.FullName}, Email: {currentUser.Email}, SĐT: {currentUser.PhoneNumber}, Địa chỉ: {currentUser.Address}";
+        }
+
+        var response = await ChatApiService.GetChatResponse(userMsg, currentUser?.FullName, basketCtx, orderCtx, profileCtx);
         
         var htmlContent = await JS.InvokeAsync<string>("renderMarkdown", response);
         
@@ -153,13 +208,7 @@
         await Task.CompletedTask;
     }
 
-    private List<Suggestion> suggestions = new()
-    {
-        new("Cho tôi xem áo sơ mi xanh", "bx-shirt"),
-        new("Hàng mới về mùa đông", "bx-cloud-snow"),
-        new("Xu hướng thời trang nam", "bx-trending-up"),
-        new("Cửa hàng có giảm giá không?", "bx-purchase-tag-alt")
-    };
+    private List<SuggestionDto> suggestions = new();
 
     public class ChatMessage
     {
@@ -167,6 +216,4 @@
         public string HtmlContent { get; set; } = "";
         public bool IsUser { get; set; }
     }
-
-    public record Suggestion(string Text, string Icon);
 }

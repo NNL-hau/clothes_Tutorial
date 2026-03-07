@@ -387,3 +387,47 @@
     color: #64748b;
     font-style: italic;
 }
+
+/* Skeleton Loaders */
+.skeleton-suggestion {
+    background: #f1f5f9;
+    border: 1px solid rgba(0, 0, 0, 0.03);
+    pointer-events: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.skeleton-line {
+    height: 12px;
+    background: #e2e8f0;
+    border-radius: 4px;
+}
+
+.skeleton-icon {
+    width: 20px;
+    height: 20px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    align-self: flex-end;
+}
+
+.skeleton-suggestion::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg,
+            rgba(255, 255, 255, 0) 0,
+            rgba(255, 255, 255, 0.5) 50%,
+            rgba(255, 255, 255, 0) 100%);
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    100% {
+        transform: translateX(100%);
+    }
+}
