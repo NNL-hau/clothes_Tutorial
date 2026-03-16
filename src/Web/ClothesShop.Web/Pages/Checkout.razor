@@ -46,12 +46,6 @@
                 <div class="checkout-section shadow-sm">
                     <h2 class="section-title"><i class="bi bi-person-badge me-2"></i>Thông tin thực nhận</h2>
                     
-                    @if (!string.IsNullOrEmpty(errorMessage))
-                    {
-                        <div class="alert alert-danger animate__animated animate__fadeIn">
-                            <i class="bi bi-exclamation-triangle-fill me-2"></i>@errorMessage
-                        </div>
-                    }
 
                     <div class="customer-form mt-4">
                         <div class="row g-3">
@@ -249,6 +243,25 @@
         </div>
     }
 </div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="error-modal-overlay" @onclick="() => errorMessage = string.Empty">
+        <div class="error-modal-content animate__animated animate__zoomIn" @onclick:stopPropagation>
+            <div class="error-modal-header">
+                <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+                <span>Thông báo</span>
+                <button class="btn-close-modal" @onclick="() => errorMessage = string.Empty">✕</button>
+            </div>
+            <div class="error-modal-body text-center">
+                <p>@errorMessage</p>
+            </div>
+            <div class="error-modal-footer">
+                <button class="btn btn-dark w-100" @onclick="() => errorMessage = string.Empty">Đóng</button>
+            </div>
+        </div>
+    </div>
+}
 
 <style>
     .checkout-container {
@@ -474,6 +487,70 @@
         font-size: 11px;
         padding: 4px 8px;
     }
+
+    /* Error Modal Overlay Styles */
+    .error-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        backdrop-filter: blur(4px);
+    }
+
+    .error-modal-content {
+        background: #fff;
+        width: 90%;
+        max-width: 400px;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    }
+
+    .error-modal-header {
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #f0f0f0;
+        font-weight: 700;
+        font-size: 18px;
+    }
+
+    .error-modal-header i {
+        font-size: 24px;
+        margin-right: 12px;
+    }
+
+    .btn-close-modal {
+        background: none;
+        border: none;
+        font-size: 20px;
+        color: #999;
+        cursor: pointer;
+        padding: 5px;
+    }
+
+    .btn-close-modal:hover {
+        color: #333;
+    }
+
+    .error-modal-body {
+        padding: 30px 20px;
+        font-size: 16px;
+        color: #444;
+        line-height: 1.5;
+    }
+
+    .error-modal-footer {
+        padding: 20px;
+        border-top: 1px solid #f0f0f0;
+    }
 </style>
 
 @code {
@@ -507,6 +584,7 @@
         await base.OnInitializedAsync();
         await LoadDataAsync();
         await HandleVnPayCallbackAsync();
+        await HandleMoMoCallbackAsync();
     }
 
     private async Task HandleVnPayCallbackAsync()
@@ -578,6 +656,66 @@
             StateHasChanged();
         }
     }
+
+    private async Task HandleMoMoCallbackAsync()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("momo_result", out var momoResult))
+        {
+            isProcessing = true;
+            isLoading = true;
+            StateHasChanged();
+
+            if (momoResult == "0")
+            {
+                // Thanh toán thành công
+                if (query.TryGetValue("orderId", out var orderIdStr) && Guid.TryParse(orderIdStr, out var orderId))
+                {
+                    // Cập nhật trạng thái đơn hàng sang Pending
+                    await OrderApiService.UpdateOrderStatusAsync(orderId, "Pending");
+                    
+                    successMessage = "Thanh toán MoMo thành công!";
+
+                    // Lưu snapshot giỏ hàng và xóa giỏ hàng
+                    var basketSnapshot = await BasketService.GetBasketAsync();
+                    if (basketSnapshot != null)
+                    {
+                        basketSnapshot.Items = basketSnapshot.Items.Where(i => i.IsSelected).ToList();
+                    }
+                    var totalPrice = basketSnapshot?.TotalPrice ?? 0;
+                    await BasketService.ClearBasketAsync();
+                    await DeductStockFromBasketItems(basketSnapshot);
+                    
+                    if (!string.IsNullOrEmpty(checkoutForm.Email))
+                    {
+                        await EmailService.SendOrderConfirmationEmailAsync(
+                            checkoutForm.Email, checkoutForm.FullName,
+                            orderId.ToString(),
+                            totalPrice);
+                    }
+
+                    await Task.Delay(1500);
+                    Navigation.NavigateTo($"/success/{orderId}");
+                }
+                else
+                {
+                    errorMessage = "Không tìm thấy thông tin đơn hàng MoMo.";
+                }
+            }
+            else
+            {
+                var msg = query.TryGetValue("message", out var m) ? m.ToString() : "Thanh toán MoMo thất bại.";
+                errorMessage = msg;
+            }
+
+            isProcessing = false;
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
     
     private bool stockDeductionFailed = false;
     private List<string> failedStockItems = new();
@@ -731,10 +869,21 @@
 
             if (!string.IsNullOrEmpty(transaction.PaymentUrl) && selectedMethod == "VNPay")
             {
-                Console.WriteLine($"[Checkout] Redirecting to: {transaction.PaymentUrl}");
+                Console.WriteLine($"[Checkout] Redirecting to VNPay: {transaction.PaymentUrl}");
                 // KHÔNG xóa giỏ hàng ở đây vì khách chưa thanh toán xong
-                // Redirect to VNPay Gateway
                 Navigation.NavigateTo(transaction.PaymentUrl, forceLoad: true);
+                return;
+            }
+
+            if (selectedMethod == "MoMo")
+            {
+                // Redirect đến trang MoMo demo nội bộ
+                // payUrl và qrCodeUrl thực từ MoMo sandbox để quét QR thật
+                var encodedPayUrl    = Uri.EscapeDataString(transaction.PaymentUrl ?? "");
+                var encodedQrCodeUrl = Uri.EscapeDataString(transaction.QrCodeUrl  ?? "");
+                var momoPageUrl = $"/momo-payment?orderId={createdOrder.Id}&transactionId={transaction.Id}&amount={basket.TotalPrice}&payUrl={encodedPayUrl}&qrCodeUrl={encodedQrCodeUrl}";
+                Console.WriteLine($"[Checkout] Redirecting to MoMo page. PayUrl: {transaction.PaymentUrl}, QrCodeUrl: {transaction.QrCodeUrl}");
+                Navigation.NavigateTo(momoPageUrl, forceLoad: true);
                 return;
             }
             

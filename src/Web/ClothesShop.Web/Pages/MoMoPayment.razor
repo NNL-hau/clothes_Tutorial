@@ -1,0 +1,336 @@
+@page "/momo-payment"
+@inject NavigationManager Navigation
+
+<div class="momo-page">
+    <div class="momo-card">
+        <div class="momo-header">
+            <img src="https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png" alt="MoMo" class="momo-logo" />
+            <h1 class="momo-title">Thanh toán MoMo</h1>
+        </div>
+
+        @if (isProcessing)
+        {
+            <div class="processing-state">
+                <div class="spinner-ring"></div>
+                <p class="processing-text">Đang xử lý thanh toán...</p>
+            </div>
+        }
+        else
+        {
+            <div class="order-info-box">
+                <div class="order-row">
+                    <span class="order-label">Mã đơn hàng</span>
+                    <span class="order-value">#@orderId?.Substring(0, Math.Min(8, orderId?.Length ?? 0)).ToUpper()</span>
+                </div>
+                <div class="order-row">
+                    <span class="order-label">Số tiền</span>
+                    <span class="order-value amount-highlight">@amount.ToString("N0") đ</span>
+                </div>
+                <div class="order-row">
+                    <span class="order-label">Nội dung</span>
+                    <span class="order-value">Thanh toán đơn hàng</span>
+                </div>
+            </div>
+
+            <div class="qr-section">
+                @if (!string.IsNullOrEmpty(qrCodeUrl))
+                {
+                    <!-- QR thực từ MoMo sandbox — app MoMo quét được -->
+                    <p class="qr-label">📱 Mở app <strong>MoMo</strong> → Quét QR để thanh toán</p>
+                    <div class="qr-wrapper">
+                        <img src="@qrCodeUrl" alt="QR Code MoMo" class="qr-code" />
+                    </div>
+                    <p class="qr-caption">
+                        Hoặc <a href="@payUrl" target="_blank" class="pay-link">nhấn vào đây</a> để mở trang thanh toán MoMo
+                    </p>
+                    <div class="qr-hint-box">
+                        <p class="qr-hint">✅ Sau khi thanh toán xong trong app MoMo, bấm <strong>"Tôi đã thanh toán"</strong> bên dưới</p>
+                        <p class="qr-test-info">Test account: SĐT <code>0000000001</code> → PIN <code>000000</code> → OTP <code>000000</code></p>
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(payUrl))
+                {
+                    <!-- Dùng payUrl để tự tạo QR -->
+                    <p class="qr-label">📱 Quét mã QR bằng ứng dụng MoMo</p>
+                    <div class="qr-wrapper">
+                        <img src="@GetQrFromPayUrl()" alt="QR Code" class="qr-code" />
+                        <div class="qr-overlay">
+                            <img src="https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png" alt="MoMo" class="qr-logo-inner" />
+                        </div>
+                    </div>
+                    <p class="qr-caption">Hoặc <a href="@payUrl" target="_blank" class="pay-link">mở link thanh toán MoMo</a></p>
+                    <div class="qr-hint-box">
+                        <p class="qr-hint">✅ Sau khi thanh toán xong trong app MoMo, bấm <strong>"Tôi đã thanh toán"</strong> bên dưới</p>
+                    </div>
+                }
+                else
+                {
+                    <!-- Fallback demo khi MoMo API không trả về URL -->
+                    <p class="qr-label">⚡ Demo mode</p>
+                    <div class="qr-wrapper qr-demo">
+                        <img src="@GetDemoQr()" alt="QR Demo" class="qr-code" />
+                        <div class="qr-overlay">
+                            <img src="https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png" alt="MoMo" class="qr-logo-inner" />
+                        </div>
+                    </div>
+                    <p class="qr-hint" style="text-align:center">Dùng nút bên dưới để mô phỏng thanh toán</p>
+                }
+            </div>
+
+            <div class="action-section">
+                <button class="btn-momo-success" @onclick="ConfirmSuccess">
+                    <span class="btn-icon">✓</span>
+                    @(string.IsNullOrEmpty(qrCodeUrl) && string.IsNullOrEmpty(payUrl) ? "Mô phỏng Thanh toán Thành công" : "Tôi đã thanh toán xong")
+                </button>
+                <button class="btn-momo-cancel" @onclick="Cancel">
+                    <span class="btn-icon">✕</span>
+                    Hủy thanh toán
+                </button>
+            </div>
+
+            <p class="demo-notice">🔒 Môi trường Sandbox MoMo — Không có tiền thật được giao dịch</p>
+        }
+    </div>
+</div>
+
+<style>
+    .momo-page {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #a50264 0%, #d30977 40%, #ff4da6 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        font-family: 'Inter', -apple-system, sans-serif;
+    }
+
+    .momo-card {
+        background: #fff;
+        border-radius: 24px;
+        padding: 40px 36px;
+        max-width: 440px;
+        width: 100%;
+        box-shadow: 0 30px 80px rgba(165, 2, 100, 0.35);
+        animation: slideUp 0.4s ease-out;
+    }
+
+    @@keyframes slideUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .momo-header { text-align: center; margin-bottom: 28px; }
+    .momo-logo   { height: 56px; width: auto; margin-bottom: 10px; }
+    .momo-title  { font-size: 22px; font-weight: 700; color: #a50264; margin: 0; }
+
+    .order-info-box {
+        background: #fdf0f8;
+        border: 1px solid #f5c6e8;
+        border-radius: 14px;
+        padding: 18px 20px;
+        margin-bottom: 24px;
+    }
+
+    .order-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 0;
+    }
+
+    .order-row + .order-row { border-top: 1px solid #f0d0e8; }
+    .order-label { font-size: 14px; color: #888; }
+    .order-value { font-size: 14px; font-weight: 600; color: #333; }
+    .amount-highlight { font-size: 18px; color: #a50264; }
+
+    .qr-section { text-align: center; margin-bottom: 24px; }
+
+    .qr-label {
+        font-size: 14px;
+        color: #555;
+        margin-bottom: 16px;
+        font-weight: 500;
+    }
+
+    .qr-wrapper {
+        position: relative;
+        display: inline-block;
+        border: 3px solid #a50264;
+        border-radius: 16px;
+        padding: 12px;
+        background: #fff;
+        margin-bottom: 12px;
+    }
+
+    .qr-wrapper.qr-demo { border-color: #ddd; }
+
+    .qr-code {
+        width: 200px;
+        height: 200px;
+        display: block;
+    }
+
+    .qr-overlay {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        background: #fff;
+        border-radius: 8px;
+        padding: 4px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .qr-logo-inner { height: 30px; width: auto; }
+
+    .qr-caption { font-size: 13px; color: #666; margin-bottom: 10px; }
+
+    .pay-link { color: #a50264; font-weight: 600; text-decoration: none; }
+    .pay-link:hover { text-decoration: underline; }
+
+    .qr-hint-box {
+        background: #fdf0f8;
+        border-left: 3px solid #a50264;
+        border-radius: 8px;
+        padding: 10px 14px;
+        text-align: left;
+    }
+
+    .qr-hint {
+        font-size: 13px;
+        color: #555;
+        margin: 0 0 6px 0;
+    }
+
+    .qr-test-info {
+        font-size: 12px;
+        color: #888;
+        margin: 0;
+    }
+
+    .qr-test-info code {
+        background: #f0d0e8;
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-family: monospace;
+        color: #a50264;
+    }
+
+    .action-section {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .btn-momo-success {
+        background: linear-gradient(135deg, #a50264, #d30977);
+        color: #fff;
+        border: none;
+        border-radius: 12px;
+        padding: 16px 24px;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .btn-momo-success:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(165, 2, 100, 0.4);
+    }
+
+    .btn-momo-cancel {
+        background: #f5f5f5;
+        color: #666;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        padding: 14px 24px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .btn-momo-cancel:hover {
+        background: #ffe8f5;
+        border-color: #f5c6e8;
+        color: #a50264;
+    }
+
+    .btn-icon { font-size: 16px; }
+
+    .demo-notice { font-size: 12px; color: #aaa; text-align: center; margin: 0; }
+
+    .processing-state { text-align: center; padding: 40px 0; }
+
+    .spinner-ring {
+        width: 56px; height: 56px;
+        border: 4px solid #f5c6e8;
+        border-top-color: #a50264;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin: 0 auto 20px;
+    }
+
+    @@keyframes spin { to { transform: rotate(360deg); } }
+
+    .processing-text { color: #a50264; font-weight: 600; }
+</style>
+
+@code {
+    private string? orderId;
+    private string? transactionId;
+    private decimal amount;
+    private string? payUrl;
+    private string? qrCodeUrl;
+    private bool isProcessing = false;
+
+    protected override void OnInitialized()
+    {
+        var uri   = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("orderId",       out var oid)) orderId       = oid.ToString();
+        if (query.TryGetValue("transactionId", out var tid)) transactionId = tid.ToString();
+        if (query.TryGetValue("amount", out var amt) && decimal.TryParse(amt, out var a)) amount = a;
+
+        // QR image PNG thực từ MoMo (ưu tiên dùng cái này)
+        if (query.TryGetValue("qrCodeUrl", out var qr) && !string.IsNullOrEmpty(qr))
+            qrCodeUrl = qr.ToString();
+
+        // payUrl để mở trang thanh toán MoMo hoặc tự tạo QR nếu không có qrCodeUrl
+        if (query.TryGetValue("payUrl", out var pu) && !string.IsNullOrEmpty(pu))
+            payUrl = pu.ToString();
+    }
+
+    private string GetQrFromPayUrl() =>
+        $"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={Uri.EscapeDataString(payUrl ?? "")}&color=a50264&margin=0";
+
+    private string GetDemoQr() =>
+        $"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={Uri.EscapeDataString($"MOMO|DEMO|{orderId}|{amount}")}&color=cccccc&margin=0";
+
+    private async Task ConfirmSuccess()
+    {
+        isProcessing = true;
+        StateHasChanged();
+        await Task.Delay(1500);
+        Navigation.NavigateTo(
+            $"/checkout?momo_result=0&orderId={orderId}&message=Thanh+to%C3%A1n+MoMo+th%C3%A0nh+c%C3%B4ng",
+            forceLoad: true);
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo(
+            $"/checkout?momo_result=1003&orderId={orderId}&message=Thanh+to%C3%A1n+MoMo+b%E1%BB%8B+h%E1%BB%A7y",
+            forceLoad: true);
+    }
+}

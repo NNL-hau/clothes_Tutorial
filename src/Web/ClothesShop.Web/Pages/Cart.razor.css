@@ -3,6 +3,7 @@
     margin: 40px auto;
     padding: 0 20px;
     min-height: 60vh;
+    font-family: 'Outfit', sans-serif;
 }
 
 .cart-header h1 {
@@ -66,7 +67,7 @@
 
 .list-header {
     display: grid;
-    grid-template-columns: 50px 1fr 120px 140px 120px 50px;
+    grid-template-columns: 50px 100px 1.5fr 1.5fr 140px 140px 140px 50px;
     padding: 15px;
     background: #f8f9fa;
     font-weight: 700;
@@ -74,6 +75,15 @@
     border-radius: 8px;
     margin-bottom: 15px;
     align-items: center;
+}
+
+.list-header span {
+    text-align: center;
+}
+
+.list-header span:nth-child(2) {
+    text-align: left;
+    padding-left: 20px;
 }
 
 .select-all-container {
@@ -84,7 +94,7 @@
 
 .cart-item {
     display: grid;
-    grid-template-columns: 50px 1fr 120px 140px 120px 50px;
+    grid-template-columns: 50px 100px 1.5fr 1.5fr 140px 140px 140px 50px;
     align-items: center;
     padding: 20px 15px;
     border-bottom: 1px solid #eee;
@@ -95,6 +105,45 @@
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+.item-visual {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.item-visual img {
+    width: 80px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.item-main-info {
+    padding: 0 15px;
+}
+
+.item-name {
+    font-weight: 700;
+    color: #333;
+    font-size: 16px;
+}
+
+.item-options-cells {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: center;
+}
+
+.item-price,
+.item-quantity,
+.item-total {
+    text-align: center;
+    font-weight: 700;
+    color: #333;
+    font-family: inherit;
 }
 
 .cart-item.unselected {
@@ -109,40 +158,13 @@ input[type="checkbox"] {
     accent-color: #d32f2f;
 }
 
-.item-info {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-}
-
-.item-info img {
-    width: 80px;
-    height: 100px;
-    object-fit: cover;
-    border-radius: 4px;
-}
-
-.item-name {
-    font-weight: 600;
-    color: #333;
-}
-
-.item-price,
-.item-total {
-    font-weight: 700;
-    color: #333;
-}
-
-.item-total {
-    color: #d32f2f;
-}
-
 .quantity-control {
     display: flex;
     align-items: center;
     border: 1px solid #ddd;
     border-radius: 4px;
     width: fit-content;
+    margin: 0 auto;
 }
 
 .q-btn {
@@ -315,6 +337,7 @@ input[type="checkbox"] {
     color: #333;
     outline: none;
     cursor: pointer;
+    font-family: inherit;
 }
 
 .option-select select:hover {
