@@ -94,9 +94,42 @@
                     {
                         <div class="error-toast">
                             <i class="fa-solid fa-circle-exclamation"></i>
-                            <span>@errorMessage</span>
+                            <div class="error-content">
+                                <span>@errorMessage</span>
+                                @if (errorMessage.Contains("đăng nhập"))
+                                {
+                                    <div class="error-links">
+                                        <a href="/login">Đăng nhập</a>
+                                        <span class="mx-1">|</span>
+                                        <a href="/register" class="fw-bold">Đăng ký ngay</a>
+                                    </div>
+                                }
+                            </div>
                         </div>
                     }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showLoginModal)
+{
+    <div class="auth-modal-overlay" @onclick="() => showLoginModal = false">
+        <div class="auth-modal" @onclick:stopPropagation>
+            <button class="close-modal" @onclick="() => showLoginModal = false">✕</button>
+            <div class="auth-modal-content">
+                <div class="auth-icon">
+                    <i class="fa-solid fa-user-lock"></i>
+                </div>
+                <h2>Yêu cầu đăng nhập</h2>
+                <p>Vui lòng đăng nhập để có thể thêm sản phẩm này vào giỏ hàng của bạn.</p>
+                <div class="auth-modal-actions">
+                    <button class="btn-primary-auth" @onclick='() => Navigation.NavigateTo("/login")'>Đăng nhập ngay</button>
+                    <button class="btn-secondary-auth" @onclick="() => showLoginModal = false">Để sau</button>
+                </div>
+                <div class="auth-footer">
+                    Chưa có tài khoản? <a href="/register">Đăng ký tại đây</a>
                 </div>
             </div>
         </div>
@@ -110,6 +143,7 @@
     private bool showDetail = false;
     private bool showSuccess = false;
     private string? errorMessage;
+    private bool showLoginModal = false;
     private bool IsNew => (DateTime.Now - Product.CreatedAt).TotalDays <= 30;
 
     private void OpenDetail()
@@ -124,16 +158,7 @@
         
         if (!await AuthService.IsAuthenticatedAsync())
         {
-            errorMessage = "Vui lòng đăng nhập để sử dụng chức năng này!";
-            if (!showDetail) showDetail = true;
-            StateHasChanged();
-            
-            _ = Task.Run(async () =>
-            {
-                await Task.Delay(3000);
-                errorMessage = null;
-                await InvokeAsync(StateHasChanged);
-            });
+            showLoginModal = true;
             return;
         }
 

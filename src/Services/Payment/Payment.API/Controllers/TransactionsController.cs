@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Payment.API.Data;
 using Payment.API.Models;
 using Payment.API.DTOs;
@@ -28,7 +31,7 @@ namespace Payment.API.Controllers
             _logger.LogInformation("Fetching all transactions");
             return await _context.Transactions
                 .OrderByDescending(t => t.CreatedAt)
-                .Select(t => new TransactionDto(t.Id, t.OrderId, t.UserName, t.Amount, t.PaymentMethod, t.Status, t.CreatedAt, null))
+                .Select(t => new TransactionDto(t.Id, t.OrderId, t.UserName, t.Amount, t.PaymentMethod, t.Status, t.CreatedAt, null, null))
                 .ToListAsync();
         }
 
@@ -234,6 +237,7 @@ namespace Payment.API.Controllers
             _logger.LogInformation("[BUILD_VER_FINAL_V2] Processing {Method} for {User}", dto.PaymentMethod, dto.UserName);
             
             bool isVnPay = string.Equals(dto.PaymentMethod, "VNPay", StringComparison.OrdinalIgnoreCase);
+            bool isMoMo = string.Equals(dto.PaymentMethod, "MoMo", StringComparison.OrdinalIgnoreCase);
             bool isCod = string.Equals(dto.PaymentMethod, "COD", StringComparison.OrdinalIgnoreCase);
 
             var transaction = new Transaction
@@ -254,6 +258,7 @@ namespace Payment.API.Controllers
             }
 
             string? paymentUrl = null;
+            string? qrCodeUrl = null;
             if (isVnPay)
             {
                 _logger.LogInformation("Creating VNPay transaction for Order: {OrderId}, Amount: {Amount}", dto.OrderId, dto.Amount);
@@ -267,6 +272,21 @@ namespace Payment.API.Controllers
                     _logger.LogError(ex, "Error generating VNPay URL");
                 }
             }
+            else if (isMoMo)
+            {
+                _logger.LogInformation("Creating MoMo transaction for Order: {OrderId}, Amount: {Amount}", dto.OrderId, dto.Amount);
+                try
+                {
+                    var momoResult = await GenerateMoMoUrl(transaction, dto);
+                    paymentUrl = momoResult.PayUrl;
+                    qrCodeUrl  = momoResult.QrCodeUrl;
+                    _logger.LogInformation("MoMo PayUrl: {PayUrl}, QrCodeUrl: {QrCodeUrl}", paymentUrl, qrCodeUrl);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error generating MoMo URL");
+                }
+            }
 
             var result = new TransactionDto(
                 transaction.Id,
@@ -276,10 +296,203 @@ namespace Payment.API.Controllers
                 transaction.PaymentMethod,
                 transaction.Status,
                 transaction.CreatedAt,
-                paymentUrl
+                paymentUrl,
+                qrCodeUrl
             );
 
             return CreatedAtAction(nameof(GetTransactions), new { id = transaction.Id }, result);
+        }
+
+        /// <summary>
+        /// MoMo sandbox callback endpoint - MoMo redirects user back here after payment
+        /// </summary>
+        [HttpGet("momo-return")]
+        public async Task<IActionResult> MoMoReturn()
+        {
+            _logger.LogInformation("MoMo Return URL hit: {Query}", Request.QueryString);
+
+            var query = Request.Query;
+            string orderId      = query["orderId"].ToString();
+            string resultCode   = query["resultCode"].ToString();
+            string message      = query["message"].ToString();
+            string signature    = query["signature"].ToString();
+            string requestId    = query["requestId"].ToString();
+            string amount       = query["amount"].ToString();
+            string partnerCode  = query["partnerCode"].ToString();
+            string orderInfo    = query["orderInfo"].ToString();
+            string orderType    = query["orderType"].ToString();
+            string transId      = query["transId"].ToString();
+            string responseTime = query["responseTime"].ToString();
+            string payType      = query["payType"].ToString();
+            string extraData    = query["extraData"].ToString();
+
+            // Verify signature
+            var secretKey = _configuration["Payment:MoMo:SecretKey"] ?? "";
+            var rawHash = $"accessKey={_configuration["Payment:MoMo:AccessKey"]}" +
+                          $"&amount={amount}" +
+                          $"&extraData={extraData}" +
+                          $"&message={message}" +
+                          $"&orderId={orderId}" +
+                          $"&orderInfo={orderInfo}" +
+                          $"&orderType={orderType}" +
+                          $"&partnerCode={partnerCode}" +
+                          $"&payType={payType}" +
+                          $"&requestId={requestId}" +
+                          $"&responseTime={responseTime}" +
+                          $"&resultCode={resultCode}" +
+                          $"&transId={transId}";
+
+            var computedSignature = HmacSHA256(rawHash, secretKey);
+            bool isValidSignature = computedSignature.Equals(signature, StringComparison.OrdinalIgnoreCase);
+
+            // orderId từ MoMo chính là transaction.Id (Guid dạng string)
+            bool isSuccess = resultCode == "0" && isValidSignature;
+
+            string dbOrderId = "";
+            if (Guid.TryParse(orderId, out var transactionId))
+            {
+                var transaction = await _context.Transactions.FindAsync(transactionId);
+                if (transaction != null)
+                {
+                    if (transaction.Status == "Pending")
+                    {
+                        transaction.Status = isSuccess ? "Success" : "Failed";
+                        await _context.SaveChangesAsync();
+                        dbOrderId = transaction.OrderId.ToString();
+
+                        if (isSuccess)
+                        {
+                            try
+                            {
+                                using var client = new HttpClient();
+                                var orderingUrl = _configuration["OrderingApiUrl"] ?? "http://ordering-api/api/orders";
+                                var updateDto = new { Status = "Pending" };
+                                await client.PatchAsJsonAsync($"{orderingUrl}/{transaction.OrderId}/status", updateDto);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Error updating Order {OrderId} after MoMo success", transaction.OrderId);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        dbOrderId = transaction.OrderId.ToString();
+                    }
+                }
+            }
+
+            var webAppUrl = _configuration["WebAppUrl"] ?? "http://localhost:5078";
+            string msg = isSuccess ? "Thanh toán MoMo thành công" : $"Thanh toán MoMo thất bại: {message}";
+            return Redirect($"{webAppUrl}/checkout?momo_result={resultCode}&orderId={dbOrderId}&message={WebUtility.UrlEncode(msg)}");
+        }
+
+        /// <summary>
+        /// MoMo IPN - server-to-server notification
+        /// </summary>
+        [HttpPost("momo-notify")]
+        public async Task<IActionResult> MoMoNotify([FromBody] JsonElement body)
+        {
+            _logger.LogInformation("MoMo IPN received");
+            try
+            {
+                string orderId    = body.GetProperty("orderId").GetString() ?? "";
+                string resultCode = body.GetProperty("resultCode").GetInt32().ToString();
+
+                if (Guid.TryParse(orderId, out var transactionId))
+                {
+                    var transaction = await _context.Transactions.FindAsync(transactionId);
+                    if (transaction != null && transaction.Status == "Pending")
+                    {
+                        transaction.Status = resultCode == "0" ? "Success" : "Failed";
+                        await _context.SaveChangesAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing MoMo IPN");
+            }
+            return Ok(new { message = "IPN received" });
+        }
+
+        private record MoMoUrlResult(string? PayUrl, string? QrCodeUrl);
+
+        private async Task<MoMoUrlResult> GenerateMoMoUrl(Transaction transaction, CreateTransactionDto dto)
+        {
+            var partnerCode = _configuration["Payment:MoMo:PartnerCode"] ?? "MOMO";
+            var accessKey   = _configuration["Payment:MoMo:AccessKey"] ?? "";
+            var secretKey   = _configuration["Payment:MoMo:SecretKey"] ?? "";
+            var paymentUrl  = _configuration["Payment:MoMo:PaymentUrl"] ?? "";
+            var returnUrl   = _configuration["Payment:MoMo:ReturnUrl"] ?? "";
+            var notifyUrl   = _configuration["Payment:MoMo:NotifyUrl"] ?? "";
+
+            var requestId   = transaction.Id.ToString();
+            var orderId     = transaction.Id.ToString();
+            var amount      = ((long)transaction.Amount).ToString();
+            var orderInfo   = "Thanh toan don hang";
+            var extraData   = "";
+            // payWithMethod trả về cả payUrl lẫn qrCodeUrl
+            var requestType = "payWithMethod";
+
+            var rawHash = $"accessKey={accessKey}" +
+                          $"&amount={amount}" +
+                          $"&extraData={extraData}" +
+                          $"&ipnUrl={notifyUrl}" +
+                          $"&orderId={orderId}" +
+                          $"&orderInfo={orderInfo}" +
+                          $"&partnerCode={partnerCode}" +
+                          $"&redirectUrl={returnUrl}" +
+                          $"&requestId={requestId}" +
+                          $"&requestType={requestType}";
+
+            var signature = HmacSHA256(rawHash, secretKey);
+
+            var momoRequest = new
+            {
+                partnerCode,
+                partnerName = "ClothesShop Demo",
+                storeId     = partnerCode,
+                requestId,
+                amount,
+                orderId,
+                orderInfo,
+                redirectUrl = returnUrl,
+                ipnUrl      = notifyUrl,
+                lang        = "vi",
+                extraData,
+                requestType,
+                signature
+            };
+
+            using var httpClient = new HttpClient();
+            var json     = JsonSerializer.Serialize(momoRequest);
+            var content  = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await httpClient.PostAsync(paymentUrl, content);
+            var responseBody = await response.Content.ReadAsStringAsync();
+            _logger.LogInformation("MoMo API response: {Body}", responseBody);
+
+            using var doc = JsonDocument.Parse(responseBody);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("resultCode", out var rcProp) && rcProp.GetInt32() == 0)
+            {
+                var payUrl     = root.TryGetProperty("payUrl",     out var p) ? p.GetString() : null;
+                var qrCodeUrl  = root.TryGetProperty("qrCodeUrl",  out var q) ? q.GetString() : null;
+                var deeplink   = root.TryGetProperty("deeplink",   out var d) ? d.GetString() : null;
+                _logger.LogInformation("MoMo payUrl={PayUrl}, qrCodeUrl={QrCodeUrl}, deeplink={Deeplink}", payUrl, qrCodeUrl, deeplink);
+                return new MoMoUrlResult(payUrl, qrCodeUrl);
+            }
+
+            var errMsg = root.TryGetProperty("message", out var msgProp) ? msgProp.GetString() : "Unknown MoMo error";
+            throw new Exception($"MoMo API error: {errMsg} | Body: {responseBody}");
+        }
+
+        private static string HmacSHA256(string data, string key)
+        {
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(key));
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
+            return Convert.ToHexString(hash).ToLower();
         }
 
         private string GenerateVnPayUrl(Transaction transaction, CreateTransactionDto dto)

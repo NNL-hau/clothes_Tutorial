@@ -34,6 +34,8 @@
                         <input type="checkbox" checked="@(basket.Items.All(i => i.IsSelected))" @onchange="ToggleAll" id="selectAll" />
                     </div>
                     <span>Sản phẩm</span>
+                    <span></span> @* Empty for Image/Details spacing *@
+                    <span></span> @* Empty for Options spacing *@
                     <span>Đơn giá</span>
                     <span>Số lượng</span>
                     <span>Thành tiền</span>
@@ -46,30 +48,33 @@
                         <div class="item-selection">
                             <input type="checkbox" checked="@item.IsSelected" @onchange="@(e => ToggleItem(item, e.Value))" />
                         </div>
-                        <div class="item-info">
+                        
+                        <div class="item-visual">
                             <img src="@ProductHelpers.GetFirstImageUrl(item.ImageUrl)" alt="@item.ProductName" />
-                            <div class="item-details">
-                                <span class="item-name">@item.ProductName</span>
-                                <div class="item-options">
-                                    <div class="option-select">
-                                        <label>Màu:</label>
-                                        <select @onchange="@(e => UpdateOptions(item, e.Value?.ToString(), item.SelectedSize))">
-                                            @foreach (var color in (item.AvailableColors ?? "").Split(',').Select(c => c.Trim()).Where(c => !string.IsNullOrEmpty(c)))
-                                            {
-                                                <option value="@color" selected="@(color.Trim().Equals(item.SelectedColor?.Trim(), StringComparison.OrdinalIgnoreCase))">@color</option>
-                                            }
-                                        </select>
-                                    </div>
-                                    <div class="option-select">
-                                        <label>Size:</label>
-                                        <select @onchange="@(e => UpdateOptions(item, item.SelectedColor, e.Value?.ToString()))">
-                                            @foreach (var size in (item.AvailableSizes ?? "").Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)))
-                                            {
-                                                <option value="@size" selected="@(size.Trim().Equals(item.SelectedSize?.Trim(), StringComparison.OrdinalIgnoreCase))">@size</option>
-                                            }
-                                        </select>
-                                    </div>
-                                </div>
+                        </div>
+
+                        <div class="item-main-info">
+                            <span class="item-name">@item.ProductName</span>
+                        </div>
+
+                        <div class="item-options-cells">
+                            <div class="option-select">
+                                <label>Màu:</label>
+                                <select @onchange="@(e => UpdateOptions(item, e.Value?.ToString(), item.SelectedSize))">
+                                    @foreach (var color in (item.AvailableColors ?? "").Split(',').Select(c => c.Trim()).Where(c => !string.IsNullOrEmpty(c)))
+                                    {
+                                        <option value="@color" selected="@(color.Trim().Equals(item.SelectedColor?.Trim(), StringComparison.OrdinalIgnoreCase))">@color</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="option-select">
+                                <label>Size:</label>
+                                <select @onchange="@(e => UpdateOptions(item, item.SelectedColor, e.Value?.ToString()))">
+                                    @foreach (var size in (item.AvailableSizes ?? "").Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)))
+                                    {
+                                        <option value="@size" selected="@(size.Trim().Equals(item.SelectedSize?.Trim(), StringComparison.OrdinalIgnoreCase))">@size</option>
+                                    }
+                                </select>
                             </div>
                         </div>
 

@@ -10,6 +10,7 @@ namespace ClothesShop.Web.Models
         string PaymentMethod,
         string Status,
         DateTime CreatedAt,
-        [property: JsonPropertyName("paymentUrl")] string? PaymentUrl = null
+        [property: JsonPropertyName("paymentUrl")] string? PaymentUrl = null,
+        [property: JsonPropertyName("qrCodeUrl")]  string? QrCodeUrl  = null
     );
 }
