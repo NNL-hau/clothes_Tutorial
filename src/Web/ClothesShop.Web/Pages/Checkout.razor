@@ -5,6 +5,9 @@
 @inject IOrderApiService OrderApiService
 @inject IProductApiService ProductService
 @inject IEmailService EmailService
+@inject HttpClient Http
+@using ClothesShop.Web.Models
+@using System.Text.RegularExpressions
 
 <div class="checkout-container">
     <div class="checkout-header">
@@ -53,53 +56,81 @@
                     <div class="customer-form mt-4">
                         <div class="row g-3">
                             <div class="col-12">
-                                <label class="form-label">Họ và tên</label>
-                                <input type="text" class="form-control" placeholder="Nhập họ và tên" @bind="checkoutForm.FullName" autocomplete="name" />
+                                <label class="form-label">Họ và tên <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control @(validationErrors.ContainsKey("FullName") ? "is-invalid" : "")" placeholder="Nhập họ và tên" @bind="checkoutForm.FullName" autocomplete="name" />
+                                @if (validationErrors.TryGetValue("FullName", out var nameError))
+                                {
+                                    <div class="invalid-feedback">@nameError</div>
+                                }
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Số điện thoại</label>
-                                <input type="tel" class="form-control" placeholder="Nhập số điện thoại nhận hàng" @bind="checkoutForm.PhoneNumber" />
+                                <label class="form-label">Số điện thoại <span class="text-danger">*</span></label>
+                                <input type="tel" class="form-control @(validationErrors.ContainsKey("PhoneNumber") ? "is-invalid" : "")" placeholder="Nhập số điện thoại nhận hàng" @bind="checkoutForm.PhoneNumber" />
+                                @if (validationErrors.TryGetValue("PhoneNumber", out var phoneError))
+                                {
+                                    <div class="invalid-feedback">@phoneError</div>
+                                }
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Email</label>
-                                <input type="email" class="form-control" placeholder="Email" @bind="checkoutForm.Email" readonly />
+                                <label class="form-label">Email <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control @(validationErrors.ContainsKey("Email") ? "is-invalid" : "")" placeholder="Email" @bind="checkoutForm.Email" />
+                                @if (validationErrors.TryGetValue("Email", out var emailError))
+                                {
+                                    <div class="invalid-feedback">@emailError</div>
+                                }
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label">Tỉnh / Thành phố</label>
-                                <select class="form-select" @bind="checkoutForm.Province">
+                                <label class="form-label">Tỉnh / Thành phố <span class="text-danger">*</span></label>
+                                <select class="form-select @(validationErrors.ContainsKey("Province") ? "is-invalid" : "")" @onchange="OnProvinceChanged">
                                     <option value="">Chọn Tỉnh / Thành phố</option>
-                                    <option value="Hà Nội">Hà Nội</option>
-                                    <option value="Hồ Chí Minh">TP. Hồ Chí Minh</option>
-                                    <option value="Đà Nẵng">Đà Nẵng</option>
-                                    <option value="Hải Phòng">Hải Phòng</option>
+                                    @if (vietnamData != null)
+                                    {
+                                        foreach (var p in vietnamData)
+                                        {
+                                            <option value="@p.Name" selected="@(checkoutForm.Province == p.Name)">@p.Name</option>
+                                        }
+                                    }
                                 </select>
+                                @if (validationErrors.TryGetValue("Province", out var provinceError))
+                                {
+                                    <div class="invalid-feedback">@provinceError</div>
+                                }
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label">Quận / Huyện</label>
-                                <select class="form-select" @bind="checkoutForm.District">
+                                <label class="form-label">Quận / Huyện <span class="text-danger">*</span></label>
+                                <select class="form-select @(validationErrors.ContainsKey("District") ? "is-invalid" : "")" @onchange="OnDistrictChanged" disabled="@(string.IsNullOrEmpty(checkoutForm.Province))">
                                     <option value="">Chọn Quận / Huyện</option>
-                                    @if (!string.IsNullOrEmpty(checkoutForm.Province))
+                                    @foreach (var d in currentDistricts)
                                     {
-                                        <option value="Quận 1">Quận 1</option>
-                                        <option value="Quận Cầu Giấy">Quận Cầu Giấy</option>
-                                        <option value="Quận Hải Châu">Quận Hải Châu</option>
+                                        <option value="@d.Name" selected="@(checkoutForm.District == d.Name)">@d.Name</option>
                                     }
                                 </select>
+                                @if (validationErrors.TryGetValue("District", out var districtError))
+                                {
+                                    <div class="invalid-feedback">@districtError</div>
+                                }
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label">Phường / Xã</label>
-                                <select class="form-select" @bind="checkoutForm.Ward">
+                                <label class="form-label">Phường / Xã <span class="text-danger">*</span></label>
+                                <select class="form-select @(validationErrors.ContainsKey("Ward") ? "is-invalid" : "")" @bind="checkoutForm.Ward" disabled="@(string.IsNullOrEmpty(checkoutForm.District))">
                                     <option value="">Chọn Phường / Xã</option>
-                                    @if (!string.IsNullOrEmpty(checkoutForm.District))
+                                    @foreach (var w in currentWards)
                                     {
-                                        <option value="Phường Bến Nghé">Phường Bến Nghé</option>
-                                        <option value="Phường Dịch Vọng">Phường Dịch Vọng</option>
+                                        <option value="@w.Name" selected="@(checkoutForm.Ward == w.Name)">@w.Name</option>
                                     }
                                 </select>
+                                @if (validationErrors.TryGetValue("Ward", out var wardError))
+                                {
+                                    <div class="invalid-feedback">@wardError</div>
+                                }
                             </div>
                             <div class="col-12">
-                                <label class="form-label">Địa chỉ chi tiết</label>
-                                <textarea class="form-control" rows="2" placeholder="Nhập số nhà, tên đường..." @bind="checkoutForm.AddressDetail"></textarea>
+                                <label class="form-label">Địa chỉ chi tiết <span class="text-danger">*</span></label>
+                                <textarea class="form-control @(validationErrors.ContainsKey("AddressDetail") ? "is-invalid" : "")" rows="2" placeholder="Nhập số nhà, tên đường..." @bind="checkoutForm.AddressDetail"></textarea>
+                                @if (validationErrors.TryGetValue("AddressDetail", out var addressError))
+                                {
+                                    <div class="invalid-feedback">@addressError</div>
+                                }
                             </div>
                         </div>
                     </div>
@@ -452,6 +483,11 @@
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
     private string selectedMethod = "COD";
+    private Dictionary<string, string> validationErrors = new();
+    
+    private List<Province>? vietnamData;
+    private List<District> currentDistricts = new();
+    private List<Ward> currentWards = new();
 
     private class CheckoutForm
     {
@@ -551,6 +587,16 @@
         isLoading = true;
         errorMessage = string.Empty;
 
+        // Load Vietnamese administrative data
+        try
+        {
+            vietnamData = await Http.GetFromJsonAsync<List<Province>>("sample-data/vietnam_provinces.json");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading address data: {ex.Message}");
+        }
+
         basket = await BasketService.GetBasketAsync();
         if (basket != null)
         {
@@ -564,7 +610,24 @@
             checkoutForm.FullName = user.FullName;
             checkoutForm.Email = user.Email;
             checkoutForm.PhoneNumber = user.PhoneNumber ?? "";
-            checkoutForm.AddressDetail = user.Address ?? "";
+            
+            if (!string.IsNullOrEmpty(user.Address))
+            {
+                var parts = user.Address.Split(", ").Select(p => p.Trim()).ToList();
+                if (parts.Count >= 4)
+                {
+                    checkoutForm.AddressDetail = parts[0];
+                    checkoutForm.Ward = parts[1];
+                    checkoutForm.District = parts[2];
+                    checkoutForm.Province = parts[3];
+                    
+                    UpdateAddressCascading();
+                }
+                else
+                {
+                    checkoutForm.AddressDetail = user.Address;
+                }
+            }
         }
 
         isLoading = false;
@@ -583,9 +646,9 @@
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(checkoutForm.FullName) || string.IsNullOrWhiteSpace(checkoutForm.PhoneNumber) || string.IsNullOrWhiteSpace(checkoutForm.Email))
+        if (!ValidateForm())
         {
-            errorMessage = "Vui lòng điền đầy đủ thông tin: Họ tên, Số điện thoại và Email.";
+            errorMessage = "Vui lòng kiểm tra lại thông tin giao hàng.";
             return;
         }
 
@@ -740,6 +803,96 @@
         {
             errorMessage = $"Lỗi cập nhật tồn kho: {string.Join(", ", failedStockItems)}. Đơn hàng vẫn được ghi nhận.";
             StateHasChanged();
+        }
+    }
+
+    private bool ValidateForm()
+    {
+        validationErrors.Clear();
+        
+        if (string.IsNullOrWhiteSpace(checkoutForm.FullName))
+            validationErrors["FullName"] = "Vui lòng nhập họ và tên.";
+            
+        if (string.IsNullOrWhiteSpace(checkoutForm.PhoneNumber))
+            validationErrors["PhoneNumber"] = "Vui lòng nhập số điện thoại.";
+        else if (!Regex.IsMatch(checkoutForm.PhoneNumber, @"^0\d{9}$"))
+            validationErrors["PhoneNumber"] = "Số điện thoại phải có 10 chữ số và bắt đầu bằng số 0.";
+            
+        if (string.IsNullOrWhiteSpace(checkoutForm.Email))
+            validationErrors["Email"] = "Vui lòng nhập email.";
+        else if (!Regex.IsMatch(checkoutForm.Email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+            validationErrors["Email"] = "Email không đúng định dạng.";
+            
+        if (string.IsNullOrWhiteSpace(checkoutForm.Province))
+            validationErrors["Province"] = "Vui lòng chọn tỉnh/thành phố.";
+            
+        if (string.IsNullOrWhiteSpace(checkoutForm.District))
+            validationErrors["District"] = "Vui lòng chọn quận/huyện.";
+            
+        if (string.IsNullOrWhiteSpace(checkoutForm.Ward))
+            validationErrors["Ward"] = "Vui lòng chọn phường/xã.";
+            
+        if (string.IsNullOrWhiteSpace(checkoutForm.AddressDetail))
+            validationErrors["AddressDetail"] = "Vui lòng nhập địa chỉ chi tiết.";
+            
+        return validationErrors.Count == 0;
+    }
+
+    private void OnProvinceChanged(ChangeEventArgs e)
+    {
+        checkoutForm.Province = e.Value?.ToString() ?? "";
+        checkoutForm.District = "";
+        checkoutForm.Ward = "";
+        UpdateAddressCascading();
+    }
+
+    private void OnDistrictChanged(ChangeEventArgs e)
+    {
+        checkoutForm.District = e.Value?.ToString() ?? "";
+        checkoutForm.Ward = "";
+        UpdateAddressCascading();
+    }
+
+    private void UpdateAddressCascading()
+    {
+        if (vietnamData == null) return;
+
+        // Try exact match or normalized match
+        var province = vietnamData.FirstOrDefault(p => p.Name == checkoutForm.Province || 
+                                                       p.Name == "Thành phố " + checkoutForm.Province || 
+                                                       p.Name == "Tỉnh " + checkoutForm.Province);
+        if (province != null)
+        {
+            checkoutForm.Province = province.Name; // Normalize
+            currentDistricts = province.Districts;
+            
+            var district = currentDistricts.FirstOrDefault(d => d.Name == checkoutForm.District ||
+                                                                d.Name == "Quận " + checkoutForm.District ||
+                                                                d.Name == "Huyện " + checkoutForm.District ||
+                                                                d.Name == "Thành phố " + checkoutForm.District);
+            if (district != null)
+            {
+                checkoutForm.District = district.Name; // Normalize
+                currentWards = district.Wards;
+                
+                var ward = currentWards.FirstOrDefault(w => w.Name == checkoutForm.Ward ||
+                                                            w.Name == "Phường " + checkoutForm.Ward ||
+                                                            w.Name == "Xã " + checkoutForm.Ward ||
+                                                            w.Name == "Thị trấn " + checkoutForm.Ward);
+                if (ward != null)
+                {
+                    checkoutForm.Ward = ward.Name; // Normalize
+                }
+            }
+            else
+            {
+                currentWards = new List<Ward>();
+            }
+        }
+        else
+        {
+            currentDistricts = new List<District>();
+            currentWards = new List<Ward>();
         }
     }
 

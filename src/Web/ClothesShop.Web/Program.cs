@@ -9,6 +9,9 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
+// Default HttpClient with app base address (used for fetching static files from wwwroot)
+builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
+
 // Configure Named HttpClients for each API
 builder.Services.AddHttpClient("IdentityApi", client => 
 { 

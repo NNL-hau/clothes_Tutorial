@@ -43,6 +43,30 @@ namespace Ordering.API.Controllers
                 .ToListAsync();
         }
 
+        [HttpGet("user/{userName}")]
+        public async Task<ActionResult<IEnumerable<OrderDto>>> GetOrdersByUser(string userName)
+        {
+            return await _context.Orders
+                .Include(o => o.OrderItems)
+                .Where(o => o.UserName == userName)
+                .OrderByDescending(o => o.CreatedAt)
+                .Select(o => new OrderDto(
+                    o.Id, 
+                    o.UserName, 
+                    o.TotalPrice, 
+                    o.OrderStatus, 
+                    o.CreatedAt,
+                    o.FullName,
+                    o.PhoneNumber,
+                    o.Province,
+                    o.District,
+                    o.Ward,
+                    o.AddressDetail,
+                    o.PaymentMethodName,
+                    o.OrderItems.Select(oi => new OrderItemDto(oi.Id, oi.ProductId, oi.ProductName, oi.Price, oi.Quantity)).ToList()))
+                .ToListAsync();
+        }
+
         [HttpPost]
         public async Task<ActionResult<OrderDto>> CreateOrder([FromBody] CreateOrderDto dto)
         {

@@ -7,6 +7,7 @@ namespace ClothesShop.Web.Services
     public interface IOrderApiService
     {
         Task<List<OrderDto>> GetOrdersAsync();
+        Task<List<OrderDto>> GetUserOrdersAsync(string userName);
         Task<OrderDto?> GetOrderAsync(Guid id);
         Task<OrderDto?> CreateOrderAsync(CreateOrderRequest request);
         Task<bool> UpdateOrderStatusAsync(Guid id, string status);
@@ -45,6 +46,21 @@ namespace ClothesShop.Web.Services
             catch (Exception ex)
             {
                 Console.WriteLine($"Error fetching orders: {ex.Message}");
+                return new List<OrderDto>();
+            }
+        }
+
+        public async Task<List<OrderDto>> GetUserOrdersAsync(string userName)
+        {
+            try
+            {
+                await AddAuthHeaderAsync();
+                var orders = await _httpClient.GetFromJsonAsync<List<OrderDto>>($"api/orders/user/{Uri.EscapeDataString(userName)}");
+                return orders ?? new List<OrderDto>();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching user orders: {ex.Message}");
                 return new List<OrderDto>();
             }
         }
