@@ -9,6 +9,7 @@ namespace ClothesShop.Web.Services
         Task AddToBasketAsync(ProductDto product, string? selectedColor = null, string? selectedSize = null);
         Task RemoveFromBasketAsync(Guid productId, string? color = null, string? size = null);
         Task ClearBasketAsync();
+        Task RemoveSelectedItemsAsync();
         Task<int> GetBasketItemCountAsync();
         Task UpdateQuantityAsync(Guid productId, string? color, string? size, int quantity);
         Task UpdateOptionsAsync(Guid productId, string? oldColor, string? oldSize, string? newColor, string? newSize);

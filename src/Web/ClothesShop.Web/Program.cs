@@ -9,6 +9,9 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
+// Register default HttpClient for the application
+builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
+
 // Configure Named HttpClients for each API
 builder.Services.AddHttpClient("IdentityApi", client => 
 { 
@@ -49,6 +52,7 @@ builder.Services.AddScoped<ICategoryApiService, CategoryApiService>();
 builder.Services.AddScoped<IReviewApiService, ReviewApiService>();
 builder.Services.AddScoped<IPaymentApiService, PaymentApiService>();
 builder.Services.AddScoped<IBasketService, BasketService>();
+builder.Services.AddScoped<IVietnamAddressService, VietnamAddressService>();
 builder.Services.AddScoped<IChatApiService, ChatApiService>(sp => 
 {
     var client = sp.GetRequiredService<IHttpClientFactory>().CreateClient("CatalogApi");

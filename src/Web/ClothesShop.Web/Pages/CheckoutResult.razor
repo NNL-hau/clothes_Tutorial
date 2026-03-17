@@ -1,5 +1,7 @@
 @page "/checkout/result"
+@using ClothesShop.Web.Services
 @inject IBasketService BasketService
+@inject IOrderApiService OrderService
 @inject NavigationManager Navigation
 
 <div class="payment-result-container">
@@ -43,7 +45,6 @@
 </div>
 
 <style>
-    /* ... (style remains same) ... */
     .payment-result-container {
         min-height: 80vh;
         display: flex;
@@ -140,11 +141,17 @@
     {
         if (isSuccess)
         {
-            await BasketService.ClearBasketAsync();
+            await BasketService.RemoveSelectedItemsAsync();
+
+            // Cập nhật trạng thái đơn hàng sang Chờ xử lý (Pending) khi thanh toán thành công
+            if (Guid.TryParse(orderId, out var oId))
+            {
+                await OrderService.UpdateOrderStatusAsync(oId, "Pending");
+            }
         }
     }
 
-    private void GoToOrders() => Navigation.NavigateTo("/my-orders");
+    private void GoToOrders() => Navigation.NavigateTo("/order-history");
     private void GoToHome() => Navigation.NavigateTo("/");
     private void GoToCheckout() => Navigation.NavigateTo("/checkout");
 }

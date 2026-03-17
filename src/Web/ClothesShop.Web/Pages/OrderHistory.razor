@@ -1,0 +1,168 @@
+@page "/order-history"
+@using ClothesShop.Web.Models
+@using ClothesShop.Web.Services
+@inject IOrderApiService OrderService
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<div class="order-history-container">
+    <div class="history-header">
+        <h1>Lịch sử đặt hàng</h1>
+        <p>Theo dõi trạng thái và quản lý các đơn hàng của bạn</p>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Đang tải lịch sử đơn hàng...</p>
+        </div>
+    }
+    else if (!orders.Any())
+    {
+        <div class="empty-state">
+            <i class="fa-solid fa-box-open"></i>
+            <h2>Bạn chưa có đơn hàng nào</h2>
+            <p>Hãy khám phá các sản phẩm mới nhất của chúng tôi!</p>
+            <a href="/products" class="btn-shop-now">Mua sắm ngay</a>
+        </div>
+    }
+    else
+    {
+        <div class="orders-list">
+            @foreach (var order in orders.OrderByDescending(o => o.CreatedAt))
+            {
+                <div class="order-card">
+                    <div class="order-card-header">
+                        <div class="order-id">
+                            <span class="label">Mã đơn hàng:</span>
+                            <span class="value">#@order.Id.ToString().Substring(0, 8).ToUpper()</span>
+                        </div>
+                        <div class="order-date">
+                            <i class="fa-regular fa-calendar"></i>
+                            @order.CreatedAt.ToString("dd/MM/yyyy HH:mm")
+                        </div>
+                        <div class="order-status">
+                            <span class="status-badge @order.OrderStatus.ToLower()">
+                                @TranslateStatus(order.OrderStatus)
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="order-card-body">
+                        <div class="order-summary">
+                            <div class="summary-item">
+                                <span class="label">Số lượng mặt hàng:</span>
+                                <span class="value">@order.OrderItems.Sum(i => i.Quantity)</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="label">Phương thức thanh toán:</span>
+<span class="value">@order.PaymentMethodName</span>
+                            </div>
+                        </div>
+
+                        <div class="order-items-preview">
+                            @foreach (var item in order.OrderItems.Take(3))
+                            {
+                                <div class="mini-item">
+                                    <span class="item-name">@item.ProductName</span>
+                                    <span class="item-qty">x @item.Quantity</span>
+                                </div>
+                            }
+                            @if (order.OrderItems.Count > 3)
+                            {
+                                <div class="more-items">và @(order.OrderItems.Count - 3) sản phẩm khác...</div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="order-card-footer">
+                        <div class="total-section">
+                            <span class="label">Tổng cộng:</span>
+                            <span class="total-price">@order.TotalPrice.ToString("N0") đ</span>
+                        </div>
+                        <div class="actions-section">
+                            @if (CanCancel(order.OrderStatus))
+                            {
+                                <button class="btn-cancel" @onclick="() => HandleCancelOrder(order)">
+                                    Huỷ đơn
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<OrderDto> orders = new();
+    private bool isLoading = true;
+    private UserInfo? currentUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser == null)
+        {
+            Navigation.NavigateTo("/login?returnUrl=/order-history");
+            return;
+        }
+
+        await LoadOrders();
+    }
+
+    private async Task LoadOrders()
+    {
+        isLoading = true;
+        try
+        {
+            orders = await OrderService.GetOrdersAsync(currentUser?.Email); 
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading order history: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+
+
+    private string TranslateStatus(string status) => status switch
+    {
+        "AwaitingPayment" => "Chờ thanh toán",
+        "Pending" => "Chờ xử lý",
+        "InProgress" => "Đang xử lý",
+        "Shipped" => "Đã giao hàng",
+        "Cancelled" => "Đã hủy",
+        _ => status
+    };
+
+    private bool CanCancel(string status)
+    {
+        return status == "AwaitingPayment" || status == "Pending";
+    }
+
+    private async Task HandleCancelOrder(OrderDto order)
+    {
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Bạn có chắc chắn muốn huỷ đơn hàng #{order.Id.ToString().Substring(0, 8).ToUpper()} không?");
+        if (confirmed)
+        {
+            var success = await OrderService.UpdateOrderStatusAsync(order.Id, "Cancelled");
+            if (success)
+            {
+                await LoadOrders();
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("alert", "Không thể huỷ đơn hàng. Có thể đơn hàng đã được xử lý bởi quản trị viên.");
+            }
+        }
+    }
+}
+

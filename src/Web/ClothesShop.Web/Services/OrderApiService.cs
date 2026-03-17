@@ -6,7 +6,7 @@ namespace ClothesShop.Web.Services
 {
     public interface IOrderApiService
     {
-        Task<List<OrderDto>> GetOrdersAsync();
+        Task<List<OrderDto>> GetOrdersAsync(string? userName = null);
         Task<OrderDto?> GetOrderAsync(Guid id);
         Task<OrderDto?> CreateOrderAsync(CreateOrderRequest request);
         Task<bool> UpdateOrderStatusAsync(Guid id, string status);
@@ -34,12 +34,17 @@ namespace ClothesShop.Web.Services
             }
         }
 
-        public async Task<List<OrderDto>> GetOrdersAsync()
+        public async Task<List<OrderDto>> GetOrdersAsync(string? userName = null)
         {
             try
             {
                 await AddAuthHeaderAsync();
-                var orders = await _httpClient.GetFromJsonAsync<List<OrderDto>>("api/orders");
+                var url = "api/orders";
+                if (!string.IsNullOrEmpty(userName))
+                {
+                    url += $"?userName={Uri.EscapeDataString(userName)}";
+                }
+                var orders = await _httpClient.GetFromJsonAsync<List<OrderDto>>(url);
                 return orders ?? new List<OrderDto>();
             }
             catch (Exception ex)

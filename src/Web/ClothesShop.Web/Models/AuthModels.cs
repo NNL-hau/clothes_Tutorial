@@ -88,9 +88,16 @@ namespace ClothesShop.Web.Models
 
     public class UpdateProfileModel
     {
+        [Required(ErrorMessage = "Vui lòng nhập số điện thoại")]
+        [RegularExpression(@"^0\d{9}$", ErrorMessage = "Số điện thoại phải là 10 chữ số và bắt đầu bằng số 0")]
         public string? PhoneNumber { get; set; }
+
         public string? Address { get; set; }
+
+        [MinLength(6, ErrorMessage = "Mật khẩu mới phải có ít nhất 6 ký tự")]
         public string? NewPassword { get; set; }
+
+        [Compare("NewPassword", ErrorMessage = "Mật khẩu xác nhận không khớp")]
         public string? ConfirmPassword { get; set; }
     }
 }

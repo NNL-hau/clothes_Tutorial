@@ -22,9 +22,16 @@ namespace Ordering.API.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<OrderDto>>> GetOrders()
+        public async Task<ActionResult<IEnumerable<OrderDto>>> GetOrders([FromQuery] string? userName)
         {
-            return await _context.Orders
+            var query = _context.Orders.AsQueryable();
+
+            if (!string.IsNullOrEmpty(userName))
+            {
+                query = query.Where(o => o.UserName == userName);
+            }
+
+            return await query
                 .Include(o => o.OrderItems)
                 .Select(o => new OrderDto(
                     o.Id, 
@@ -48,6 +55,9 @@ namespace Ordering.API.Controllers
         {
             _logger.LogInformation("Creating order for User: {UserName}, FullName: {FullName}", dto.UserName, dto.FullName);
             
+            var isOnlinePayment = dto.PaymentMethodName == "MoMo" || dto.PaymentMethodName == "VNPay";
+            var initialStatus = isOnlinePayment ? "AwaitingPayment" : "Pending";
+
             var order = new Order
             {
                 UserName = dto.UserName,
@@ -69,7 +79,7 @@ namespace Ordering.API.Controllers
                 CVV = dto.CVV,
                 PaymentMethodName = dto.PaymentMethodName,
                 PaymentMethod = dto.PaymentMethod,
-                OrderStatus = "AwaitingPayment",
+                OrderStatus = initialStatus,
                 OrderItems = dto.OrderItems.Select(oi => new OrderItem
                 {
                     ProductId = oi.ProductId,
@@ -81,6 +91,12 @@ namespace Ordering.API.Controllers
 
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
+
+            // Nếu đơn hàng nhẩy thẳng vào trạng thái Pending (MoMo/VNPay), thực hiện trừ kho luôn
+            if (initialStatus == "Pending")
+            {
+                await DeductStockAsync(order);
+            }
 
             var result = new OrderDto(
                 order.Id,
@@ -135,6 +151,13 @@ namespace Ordering.API.Controllers
             if (order == null) return NotFound();
 
             var oldStatus = order.OrderStatus;
+
+            // Simple validation: Cannot cancel if already InProgress or Shipped
+            if (dto.Status == "Cancelled" && (oldStatus == "InProgress" || oldStatus == "Shipped"))
+            {
+                return BadRequest("Không thể hủy đơn hàng đã được xác nhận hoặc đang giao.");
+            }
+
             order.OrderStatus = dto.Status;
             await _context.SaveChangesAsync();
 
@@ -142,42 +165,46 @@ namespace Ordering.API.Controllers
             // thì thực hiện trừ tồn kho tại Catalog API
             if (dto.Status == "Pending" && oldStatus != "Pending")
             {
-                _logger.LogInformation("Order {OrderId} paid successfully. Deducting stock...", id);
-                
-                var catalogUrl = _configuration["CatalogApiUrl"];
-                if (string.IsNullOrEmpty(catalogUrl))
-                {
-                    _logger.LogError("CatalogApiUrl is not configured!");
-                }
-                else 
-                {
-                    using var client = new HttpClient();
-                    foreach (var item in order.OrderItems)
-                    {
-                        try 
-                        {
-                            // PATCH /api/products/{id}/deduct-stock?quantity={qty}
-                            var response = await client.PatchAsync($"{catalogUrl}/{item.ProductId}/deduct-stock?quantity={item.Quantity}", null);
-                            
-                            if (response.IsSuccessStatusCode)
-                            {
-                                _logger.LogInformation("Successfully deducted {Quantity} for Product {ProductId}", item.Quantity, item.ProductId);
-                            }
-                            else 
-                            {
-                                var error = await response.Content.ReadAsStringAsync();
-                                _logger.LogError("Failed to deduct stock for Product {ProductId}: {Error}", item.ProductId, error);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Error calling Catalog API for Product {ProductId}", item.ProductId);
-                        }
-                    }
-                }
+                await DeductStockAsync(order);
             }
 
             return NoContent();
+        }
+
+        private async Task DeductStockAsync(Order order)
+        {
+            _logger.LogInformation("Order {OrderId} is in Pending status. Deducting stock...", order.Id);
+
+            var catalogUrl = _configuration["CatalogApiUrl"];
+            if (string.IsNullOrEmpty(catalogUrl))
+            {
+                _logger.LogError("CatalogApiUrl is not configured!");
+                return;
+            }
+
+            using var client = new HttpClient();
+            foreach (var item in order.OrderItems)
+            {
+                try
+                {
+                    // PATCH /api/products/{id}/deduct-stock?quantity={qty}
+                    var response = await client.PatchAsync($"{catalogUrl}/{item.ProductId}/deduct-stock?quantity={item.Quantity}", null);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation("Successfully deducted {Quantity} for Product {ProductId}", item.Quantity, item.ProductId);
+                    }
+                    else
+                    {
+                        var error = await response.Content.ReadAsStringAsync();
+                        _logger.LogError("Failed to deduct stock for Product {ProductId}: {Error}", item.ProductId, error);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error calling Catalog API for Product {ProductId}", item.ProductId);
+                }
+            }
         }
 
         [HttpDelete("{id}")]
