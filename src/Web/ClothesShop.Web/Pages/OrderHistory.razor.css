@@ -1,0 +1,239 @@
+.order-history-container {
+    max-width: 1000px;
+    margin: 40px auto;
+    padding: 0 20px;
+    min-height: 70vh;
+    font-family: 'Outfit', sans-serif;
+}
+
+.history-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.history-header h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: #1a1a1a;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+}
+
+.history-header p {
+    color: #666;
+    font-size: 1.1rem;
+}
+
+.loading-state, .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+}
+
+.empty-state i {
+    font-size: 4rem;
+    color: #eee;
+    margin-bottom: 20px;
+}
+
+.empty-state h2 {
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.btn-shop-now {
+    display: inline-block;
+    background: #1a1a1a;
+    color: white;
+    padding: 12px 30px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    margin-top: 20px;
+    transition: all 0.3s;
+}
+
+.btn-shop-now:hover {
+    background: #d32f2f;
+    transform: translateY(-2px);
+}
+
+.orders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+.order-card {
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    border: 1px solid #f0f0f0;
+    transition: transform 0.3s;
+}
+
+.order-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+}
+
+.order-card-header {
+    padding: 20px;
+    background: #fafafa;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.order-id .label {
+    color: #999;
+    font-size: 0.85rem;
+    margin-right: 5px;
+}
+
+.order-id .value {
+    font-weight: 700;
+    color: #d32f2f;
+    font-size: 1.1rem;
+}
+
+.order-date {
+    color: #666;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-badge {
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.status-badge.awaitingpayment { background: #fff5f5; color: #e53e3e; }
+.status-badge.pending { background: #fffaf0; color: #dd6b20; }
+.status-badge.inprogress { background: #ebf8ff; color: #3182ce; }
+.status-badge.shipped { background: #f0fff4; color: #38a169; }
+.status-badge.cancelled { background: #f7fafc; color: #718096; }
+
+.order-card-body {
+    padding: 20px;
+}
+
+.order-summary {
+    display: flex;
+    gap: 40px;
+    margin-bottom: 20px;
+}
+
+.summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.summary-item .label {
+    font-size: 0.85rem;
+    color: #999;
+}
+
+.summary-item .value {
+    font-weight: 600;
+    color: #333;
+}
+
+.order-items-preview {
+    background: #fdfdfd;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px dashed #eee;
+}
+
+.mini-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+.mini-item:last-child { margin-bottom: 0; }
+
+.item-name { color: #555; }
+.item-qty { font-weight: 600; color: #1a1a1a; }
+
+.more-items {
+    font-size: 0.85rem;
+    color: #999;
+    font-style: italic;
+    margin-top: 10px;
+}
+
+.order-card-footer {
+    padding: 20px;
+    background: #fff;
+    border-top: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.total-section .label {
+    font-size: 0.9rem;
+    color: #333;
+    margin-right: 10px;
+}
+
+.total-price {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #d32f2f;
+}
+
+.btn-cancel {
+    background: transparent;
+    color: #e53e3e;
+    border: 1px solid #e53e3e;
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-cancel:hover {
+    background: #e53e3e;
+    color: white;
+}
+
+@media (max-width: 600px) {
+    .order-card-header, .order-card-footer {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .actions-section {
+        width: 100%;
+        margin-top: 15px;
+    }
+    
+    .btn-cancel {
+        width: 100%;
+    }
+    
+    .order-summary {
+        flex-direction: column;
+        gap: 15px;
+    }
+}

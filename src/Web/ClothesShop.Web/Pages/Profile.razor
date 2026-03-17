@@ -2,6 +2,7 @@
 @using ClothesShop.Web.Models
 @using ClothesShop.Web.Services
 @inject IAuthService AuthService
+@inject IVietnamAddressService AddressService
 @inject NavigationManager Navigation
 @inject HttpClient Http
 
@@ -38,30 +39,28 @@
 
                         <div class="form-group mb-4">
                             <label class="form-label">Số điện thoại</label>
-                            <input type="text" class="form-control" @bind-value="updateModel.PhoneNumber" placeholder="Số điện thoại của bạn" />
+                            <InputText class="form-control" @bind-Value="updateModel.PhoneNumber" placeholder="Số điện thoại của bạn" />
+                            <ValidationMessage For="@(() => updateModel.PhoneNumber)" class="text-danger small mt-1" />
                         </div>
 
-                        <div class="row mb-4">
+                        <div class="row g-3 mb-4">
                             <div class="col-md-4">
                                 <label class="form-label">Tỉnh / Thành phố</label>
-                                <select class="form-select" @onchange="OnProvinceChanged">
+                                <select class="form-select" Value="@selectedProvince" @onchange="OnProvinceChanged">
                                     <option value="">Tỉnh / Thành phố</option>
-                                    @if (vietnamData != null)
+                                    @foreach (var province in provinces)
                                     {
-                                        foreach (var province in vietnamData)
-                                        {
-                                            <option value="@province.Name" selected="@(selectedProvince == province.Name)">@province.Name</option>
-                                        }
+                                        <option value="@province" selected="@(selectedProvince == province)">@province</option>
                                     }
                                 </select>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">Quận / Huyện</label>
-                                <select class="form-select" @onchange="OnDistrictChanged" disabled="@(string.IsNullOrEmpty(selectedProvince))">
+                                <select class="form-select" Value="@selectedDistrict" @onchange="OnDistrictChanged" disabled="@(string.IsNullOrEmpty(selectedProvince))">
                                     <option value="">Quận / Huyện</option>
-                                    @foreach (var district in currentDistricts)
+                                    @foreach (var district in districtsOfProvince)
                                     {
-                                        <option value="@district.Name" selected="@(selectedDistrict == district.Name)">@district.Name</option>
+                                        <option value="@district" selected="@(selectedDistrict == district)">@district</option>
                                     }
                                 </select>
                             </div>
@@ -69,9 +68,9 @@
                                 <label class="form-label">Phường / Xã</label>
                                 <select class="form-select" @bind="selectedWard" disabled="@(string.IsNullOrEmpty(selectedDistrict))">
                                     <option value="">Phường / Xã</option>
-                                    @foreach (var ward in currentWards)
+                                    @foreach (var ward in wardsOfDistrict)
                                     {
-                                        <option value="@ward.Name" selected="@(selectedWard == ward.Name)">@ward.Name</option>
+                                        <option value="@ward" selected="@(selectedWard == ward)">@ward</option>
                                     }
                                 </select>
                             </div>
@@ -91,12 +90,14 @@
 
                         <div class="form-group mb-4">
                             <label class="form-label">Mật khẩu mới</label>
-                            <input type="password" class="form-control" @bind-value="updateModel.NewPassword" placeholder="Nhập mật khẩu mới" />
+                            <InputText type="password" class="form-control" @bind-Value="updateModel.NewPassword" placeholder="Nhập mật khẩu mới" />
+                            <ValidationMessage For="@(() => updateModel.NewPassword)" class="text-danger small mt-1" />
                         </div>
 
                         <div class="form-group mb-4">
                             <label class="form-label">Xác nhận mật khẩu mới</label>
-                            <input type="password" class="form-control" @bind-value="updateModel.ConfirmPassword" placeholder="Xác nhận mật khẩu" />
+                            <InputText type="password" class="form-control" @bind-Value="updateModel.ConfirmPassword" placeholder="Xác nhận mật khẩu" />
+                            <ValidationMessage For="@(() => updateModel.ConfirmPassword)" class="text-danger small mt-1" />
                         </div>
                     </div>
 
@@ -137,26 +138,15 @@
     private string selectedWard = "";
     private string detailAddress = "";
 
-    private List<Province>? vietnamData;
-    private List<District> currentDistricts = new();
-    private List<Ward> currentWards = new();
+    private List<string> provinces = new();
+    private List<string> districtsOfProvince = new();
+    private List<string> wardsOfDistrict = new();
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadAddressData();
+        await AddressService.InitializeAsync();
+        provinces = AddressService.GetProvinces();
         await LoadUserData();
-    }
-
-    private async Task LoadAddressData()
-    {
-        try
-        {
-            vietnamData = await Http.GetFromJsonAsync<List<Province>>("sample-data/vietnam_provinces.json");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading address data: {ex.Message}");
-        }
     }
 
     private async Task LoadUserData()
@@ -183,7 +173,8 @@
                 selectedDistrict = parts[2];
                 selectedProvince = parts[3];
                 
-                UpdateAddressCascading();
+                UpdateDistricts();
+                UpdateWards();
             }
             else
             {
@@ -194,62 +185,30 @@
         isLoading = false;
     }
 
-    private void UpdateAddressCascading()
-    {
-        if (vietnamData == null) return;
-
-        // Try exact match or normalized match
-        var province = vietnamData.FirstOrDefault(p => p.Name == selectedProvince || 
-                                                       p.Name == "Thành phố " + selectedProvince || 
-                                                       p.Name == "Tỉnh " + selectedProvince);
-        if (province != null)
-        {
-            selectedProvince = province.Name; // Normalize
-            currentDistricts = province.Districts;
-            
-            var district = currentDistricts.FirstOrDefault(d => d.Name == selectedDistrict ||
-                                                                d.Name == "Quận " + selectedDistrict ||
-                                                                d.Name == "Huyện " + selectedDistrict ||
-                                                                d.Name == "Thành phố " + selectedDistrict);
-            if (district != null)
-            {
-                selectedDistrict = district.Name; // Normalize
-                currentWards = district.Wards;
-                
-                var ward = currentWards.FirstOrDefault(w => w.Name == selectedWard ||
-                                                            w.Name == "Phường " + selectedWard ||
-                                                            w.Name == "Xã " + selectedWard ||
-                                                            w.Name == "Thị trấn " + selectedWard);
-                if (ward != null)
-                {
-                    selectedWard = ward.Name; // Normalize
-                }
-            }
-            else
-            {
-                currentWards = new List<Ward>();
-            }
-        }
-        else
-        {
-            currentDistricts = new List<District>();
-            currentWards = new List<Ward>();
-        }
-    }
-
     private void OnProvinceChanged(ChangeEventArgs e)
     {
         selectedProvince = e.Value?.ToString() ?? "";
         selectedDistrict = "";
         selectedWard = "";
-        UpdateAddressCascading();
+        UpdateDistricts();
     }
 
     private void OnDistrictChanged(ChangeEventArgs e)
     {
         selectedDistrict = e.Value?.ToString() ?? "";
         selectedWard = "";
-        UpdateAddressCascading();
+        UpdateWards();
+    }
+
+    private void UpdateDistricts()
+    {
+        districtsOfProvince = AddressService.GetDistricts(selectedProvince);
+        wardsOfDistrict = new List<string>();
+    }
+
+    private void UpdateWards()
+    {
+        wardsOfDistrict = AddressService.GetWards(selectedDistrict);
     }
 
     private async Task HandleUpdate()
@@ -268,18 +227,6 @@
             else
             {
                 updateModel.Address = detailAddress;
-            }
-
-            if (!string.IsNullOrEmpty(updateModel.NewPassword))
-            {
-                if (updateModel.NewPassword.Length < 6)
-                {
-                    throw new Exception("Mật khẩu phải có ít nhất 6 ký tự");
-                }
-                if (updateModel.NewPassword != updateModel.ConfirmPassword)
-                {
-                    throw new Exception("Mật khẩu xác nhận không khớp");
-                }
             }
 
             var result = await AuthService.UpdateProfileAsync(updateModel);

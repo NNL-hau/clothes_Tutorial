@@ -65,15 +65,41 @@
     gap: 40px;
 }
 
+.cart-items-list {
+    max-height: 55vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 5px; /* Thêm khoảng trống cho scrollbar */
+}
+
+/* Custom Scrollbar for Cart Items */
+.cart-items-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.cart-items-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.cart-items-list::-webkit-scrollbar-thumb {
+    background: #ddd;
+    border-radius: 10px;
+}
+
+.cart-items-list::-webkit-scrollbar-thumb:hover {
+    background: #bbb;
+}
+
 .list-header {
     display: grid;
     grid-template-columns: 50px 100px 1.5fr 1.5fr 140px 140px 140px 50px;
     padding: 15px;
+    padding-right: 21px; /* Align with scrollable content (15px + 6px scrollbar) */
     background: #f8f9fa;
     font-weight: 700;
     color: #666;
     border-radius: 8px;
-    margin-bottom: 15px;
+    margin-bottom: 5px;
     align-items: center;
 }
 

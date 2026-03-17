@@ -323,14 +323,15 @@
         StateHasChanged();
         await Task.Delay(1500);
         Navigation.NavigateTo(
-            $"/checkout?momo_result=0&orderId={orderId}&message=Thanh+to%C3%A1n+MoMo+th%C3%A0nh+c%C3%B4ng",
+            $"/checkout?momo_result=0&orderId={orderId}&transactionId={transactionId}&message=Thanh+to%C3%A1n+MoMo+th%C3%A0nh+c%C3%B4ng",
             forceLoad: true);
     }
 
     private void Cancel()
     {
         Navigation.NavigateTo(
-            $"/checkout?momo_result=1003&orderId={orderId}&message=Thanh+to%C3%A1n+MoMo+b%E1%BB%8B+h%E1%BB%A7y",
+            $"/checkout?momo_result=1003&orderId={orderId}&transactionId={transactionId}&message=Thanh+to%C3%A1n+MoMo+b%E1%BB%8B+h%E1%BB%A7y",
             forceLoad: true);
     }
 }
+

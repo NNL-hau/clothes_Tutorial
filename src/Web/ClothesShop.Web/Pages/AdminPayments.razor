@@ -49,7 +49,8 @@
                                 <td><div style="font-weight: 700; color: var(--text-main);">@t.Amount.ToString("N0")₫</div></td>
                                 <td>
                                     <span class="payment-method-tag">
-                                        <i class="@GetPaymentIcon(t.PaymentMethod)"></i> @t.PaymentMethod
+                                        <i class="@GetPaymentIcon(t.PaymentMethod)"></i>
+                                        @t.PaymentMethod
                                     </span>
                                 </td>
                                 <td>
@@ -118,6 +119,16 @@
         }
     }
 
+    private string GetPaymentLogo(string method)
+    {
+        return method.ToLower() switch
+        {
+            "momo" => "https://img.vietqr.io/image/momo.png",
+            "vnpay" => "https://img.vietqr.io/image/vnpay.png",
+            _ => "https://cdn-icons-png.flaticon.com/512/2489/2489756.png" // COD icon
+        };
+    }
+
     private string GetPaymentIcon(string method)
     {
         return method.ToLower() switch
@@ -154,3 +165,4 @@
 
     protected override bool RequireAdminRole => true;
 }
+

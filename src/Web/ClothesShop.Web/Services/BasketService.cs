@@ -109,6 +109,16 @@ namespace ClothesShop.Web.Services
             NotifyStateChanged();
         }
 
+        public async Task RemoveSelectedItemsAsync()
+        {
+            var basket = await GetBasketAsync();
+            basket.Items.RemoveAll(i => i.IsSelected);
+            
+            var key = GetBasketKey();
+            await _localStorage.SetItemAsync(key, basket);
+            NotifyStateChanged();
+        }
+
         public async Task<int> GetBasketItemCountAsync()
         {
             if (!await _authService.IsAuthenticatedAsync())

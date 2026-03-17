@@ -28,7 +28,7 @@
     else
     {
         <div class="cart-content">
-            <div class="cart-items-list">
+            <div class="cart-items-container">
                 <div class="list-header">
                     <div class="select-all-container">
                         <input type="checkbox" checked="@(basket.Items.All(i => i.IsSelected))" @onchange="ToggleAll" id="selectAll" />
@@ -41,6 +41,8 @@
                     <span>Thành tiền</span>
                     <span></span>
                 </div>
+
+                <div class="cart-items-list">
 
                 @foreach (var item in basket.Items)
                 {
@@ -98,6 +100,7 @@
                     </div>
                 }
             </div>
+        </div>
 
             <div class="cart-summary">
                 <h3>Tóm tắt đơn hàng</h3>

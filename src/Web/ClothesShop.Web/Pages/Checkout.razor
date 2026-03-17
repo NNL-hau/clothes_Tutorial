@@ -6,8 +6,10 @@
 @inject IProductApiService ProductService
 @inject IEmailService EmailService
 @inject HttpClient Http
+@inject IVietnamAddressService AddressService
 @using ClothesShop.Web.Models
 @using System.Text.RegularExpressions
+@using System.ComponentModel.DataAnnotations
 
 <div class="checkout-container">
     <div class="checkout-header">
@@ -40,207 +42,187 @@
     }
     else
     {
-        <div class="row g-4">
-            <!-- Cột trái: Thông tin giao hàng & Thanh toán -->
-            <div class="col-lg-7">
-                <div class="checkout-section shadow-sm">
-                    <h2 class="section-title"><i class="bi bi-person-badge me-2"></i>Thông tin thực nhận</h2>
-                    
-
-                    <div class="customer-form mt-4">
-                        <div class="row g-3">
-                            <div class="col-12">
-                                <label class="form-label">Họ và tên <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control @(validationErrors.ContainsKey("FullName") ? "is-invalid" : "")" placeholder="Nhập họ và tên" @bind="checkoutForm.FullName" autocomplete="name" />
-                                @if (validationErrors.TryGetValue("FullName", out var nameError))
-                                {
-                                    <div class="invalid-feedback">@nameError</div>
-                                }
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Số điện thoại <span class="text-danger">*</span></label>
-                                <input type="tel" class="form-control @(validationErrors.ContainsKey("PhoneNumber") ? "is-invalid" : "")" placeholder="Nhập số điện thoại nhận hàng" @bind="checkoutForm.PhoneNumber" />
-                                @if (validationErrors.TryGetValue("PhoneNumber", out var phoneError))
-                                {
-                                    <div class="invalid-feedback">@phoneError</div>
-                                }
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Email <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control @(validationErrors.ContainsKey("Email") ? "is-invalid" : "")" placeholder="Email" @bind="checkoutForm.Email" />
-                                @if (validationErrors.TryGetValue("Email", out var emailError))
-                                {
-                                    <div class="invalid-feedback">@emailError</div>
-                                }
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Tỉnh / Thành phố <span class="text-danger">*</span></label>
-                                <select class="form-select @(validationErrors.ContainsKey("Province") ? "is-invalid" : "")" @onchange="OnProvinceChanged">
-                                    <option value="">Chọn Tỉnh / Thành phố</option>
-                                    @if (vietnamData != null)
-                                    {
-                                        foreach (var p in vietnamData)
-                                        {
-                                            <option value="@p.Name" selected="@(checkoutForm.Province == p.Name)">@p.Name</option>
-                                        }
-                                    }
-                                </select>
-                                @if (validationErrors.TryGetValue("Province", out var provinceError))
-                                {
-                                    <div class="invalid-feedback">@provinceError</div>
-                                }
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Quận / Huyện <span class="text-danger">*</span></label>
-                                <select class="form-select @(validationErrors.ContainsKey("District") ? "is-invalid" : "")" @onchange="OnDistrictChanged" disabled="@(string.IsNullOrEmpty(checkoutForm.Province))">
-                                    <option value="">Chọn Quận / Huyện</option>
-                                    @foreach (var d in currentDistricts)
-                                    {
-                                        <option value="@d.Name" selected="@(checkoutForm.District == d.Name)">@d.Name</option>
-                                    }
-                                </select>
-                                @if (validationErrors.TryGetValue("District", out var districtError))
-                                {
-                                    <div class="invalid-feedback">@districtError</div>
-                                }
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Phường / Xã <span class="text-danger">*</span></label>
-                                <select class="form-select @(validationErrors.ContainsKey("Ward") ? "is-invalid" : "")" @bind="checkoutForm.Ward" disabled="@(string.IsNullOrEmpty(checkoutForm.District))">
-                                    <option value="">Chọn Phường / Xã</option>
-                                    @foreach (var w in currentWards)
-                                    {
-                                        <option value="@w.Name" selected="@(checkoutForm.Ward == w.Name)">@w.Name</option>
-                                    }
-                                </select>
-                                @if (validationErrors.TryGetValue("Ward", out var wardError))
-                                {
-                                    <div class="invalid-feedback">@wardError</div>
-                                }
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label">Địa chỉ chi tiết <span class="text-danger">*</span></label>
-                                <textarea class="form-control @(validationErrors.ContainsKey("AddressDetail") ? "is-invalid" : "")" rows="2" placeholder="Nhập số nhà, tên đường..." @bind="checkoutForm.AddressDetail"></textarea>
-                                @if (validationErrors.TryGetValue("AddressDetail", out var addressError))
-                                {
-                                    <div class="invalid-feedback">@addressError</div>
-                                }
-                            </div>
-                        </div>
-                    </div>
-
-                    <h2 class="section-title mt-5"><i class="bi bi-credit-card me-2"></i>Phương thức thanh toán</h2>
-                    <div class="payment-selection mt-3">
-                        <div class="payment-option @(selectedMethod == "COD" ? "active" : "")" @onclick='() => SetPaymentMethod("COD")'>
-                            <div class="radio-indicator"></div>
-                            <div class="payment-info">
-                                <span class="payment-name">Thanh toán khi nhận hàng (COD)</span>
-                                <span class="payment-desc">Thanh toán bằng tiền mặt khi bạn nhận được hàng.</span>
-                            </div>
-                            <i class="bi bi-cash payment-icon"></i>
-                        </div>
+        <EditForm EditContext="@editContext" OnValidSubmit="HandleCheckout">
+            <DataAnnotationsValidator />
+            
+            <div class="row g-4">
+                <!-- Cột trái: Thông tin giao hàng & Thanh toán -->
+                <div class="col-lg-7">
+                    <div class="checkout-section shadow-sm">
+                        <h2 class="section-title"><i class="bi bi-person-badge me-2"></i>Thông tin thực nhận</h2>
                         
-                        <div class="payment-option @(selectedMethod == "MoMo" ? "active" : "")" @onclick='() => SetPaymentMethod("MoMo")'>
-                            <div class="radio-indicator"></div>
-                            <div class="payment-info">
-                                <span class="payment-name">Ví MoMo</span>
-                                <span class="payment-desc">Thanh toán qua ứng dụng MoMo (Demo).</span>
-                            </div>
-                            <img src="https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png" class="payment-icon-img" alt="MoMo" />
-                        </div>
 
-                        <div class="payment-option @(selectedMethod == "VNPay" ? "active" : "")" @onclick='() => SetPaymentMethod("VNPay")'>
-                            <div class="radio-indicator"></div>
-                            <div class="payment-info">
-                                <span class="payment-name">VNPay</span>
-                                <span class="payment-desc">Thanh toán quét mã QR (Demo).</span>
-                            </div>
-                            <img src="https://vnpay.vn/wp-content/uploads/2020/07/Logo-VNPAY700x350.png" class="payment-icon-img" alt="VNPay" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Cột phải: Tóm tắt đơn hàng -->
-            <div class="col-lg-5">
-                <div class="order-sidebar sticky-top" style="top: 20px;">
-                    <div class="coupon-box shadow-sm mb-4">
-                        <div class="input-group">
-                            <span class="input-group-text bg-white border-end-0"><i class="bi bi-ticket-perforated"></i></span>
-                            <input type="text" class="form-control border-start-0" placeholder="Chọn hoặc nhập mã ưu đãi" />
-                            <button class="btn btn-outline-secondary">Xác nhận</button>
-                        </div>
-                    </div>
-
-                    <div class="order-summary-card shadow-sm">
-                        <h3 class="summary-title">Tóm tắt đơn hàng</h3>
-                        
-                        <div class="basket-items-list">
-                            @foreach (var item in basket.Items)
-                            {
-                                <div class="basket-item-mini">
-                                    <div class="item-details">
-                                        <span class="item-name">@item.ProductName</span>
-                                        <div class="item-meta-mini">
-                                            @if (!string.IsNullOrEmpty(item.SelectedColor))
-                                            {
-                                                <span class="badge bg-light text-dark border me-1">@item.SelectedColor</span>
-                                            }
-                                            @if (!string.IsNullOrEmpty(item.SelectedSize))
-                                            {
-                                                <span class="badge bg-light text-dark border">@item.SelectedSize</span>
-                                            }
-                                        </div>
-                                        <span class="item-qty">Số lượng: @item.Quantity</span>
-                                    </div>
-                                    <div class="item-price">@((item.Price * item.Quantity).ToString("N0")) đ</div>
+                        <div class="customer-form mt-4">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label">Họ và tên</label>
+                                    <InputText class="form-control" placeholder="Nhập họ và tên" @bind-Value="checkoutForm.FullName" autocomplete="name" />
+                                    <ValidationMessage For="@(() => checkoutForm.FullName)" class="text-danger small" />
                                 </div>
-                            }
+                                <div class="col-md-6">
+                                    <label class="form-label">Số điện thoại</label>
+                                    <InputText type="tel" class="form-control" placeholder="Nhập số điện thoại nhận hàng" @bind-Value="checkoutForm.PhoneNumber" />
+                                    <ValidationMessage For="@(() => checkoutForm.PhoneNumber)" class="text-danger small" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Email</label>
+                                    <InputText type="email" class="form-control" placeholder="Email" @bind-Value="checkoutForm.Email" />
+                                    <ValidationMessage For="@(() => checkoutForm.Email)" class="text-danger small" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Tỉnh / Thành phố</label>
+                                    <InputSelect class="form-select" Value="@checkoutForm.Province" ValueExpression="@(() => checkoutForm.Province)" ValueChanged="@((string val) => OnProvinceChanged(val))">
+                                        <option value="">Chọn Tỉnh / Thành phố</option>
+                                        @foreach (var province in provinces)
+                                        {
+                                            <option value="@province">@province</option>
+                                        }
+                                    </InputSelect>
+                                    <ValidationMessage For="@(() => checkoutForm.Province)" class="text-danger small" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Quận / Huyện</label>
+                                    <InputSelect class="form-select" Value="@checkoutForm.District" ValueExpression="@(() => checkoutForm.District)" ValueChanged="@((string val) => OnDistrictChanged(val))" disabled="@(string.IsNullOrEmpty(checkoutForm.Province))">
+                                        <option value="">Chọn Quận / Huyện</option>
+                                        @foreach (var district in districts)
+                                        {
+                                            <option value="@district">@district</option>
+                                        }
+                                    </InputSelect>
+                                    <ValidationMessage For="@(() => checkoutForm.District)" class="text-danger small" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Phường / Xã</label>
+                                    <InputSelect class="form-select" @bind-Value="checkoutForm.Ward" disabled="@(string.IsNullOrEmpty(checkoutForm.District))">
+                                        <option value="">Chọn Phường / Xã</option>
+                                        @foreach (var ward in wards)
+                                        {
+                                            <option value="@ward">@ward</option>
+                                        }
+                                    </InputSelect>
+                                    <ValidationMessage For="@(() => checkoutForm.Ward)" class="text-danger small" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Địa chỉ chi tiết</label>
+                                    <InputTextArea class="form-control" rows="2" placeholder="Nhập số nhà, tên đường..." @bind-Value="checkoutForm.AddressDetail"></InputTextArea>
+                                    <ValidationMessage For="@(() => checkoutForm.AddressDetail)" class="text-danger small" />
+                                </div>
+                            </div>
                         </div>
 
-                        <hr />
+                        <h2 class="section-title mt-5"><i class="bi bi-credit-card me-2"></i>Phương thức thanh toán</h2>
+                        <div class="payment-selection mt-3">
+                            <div class="payment-option @(selectedMethod == "COD" ? "active" : "")" @onclick='() => SetPaymentMethod("COD")'>
+                                <div class="radio-indicator"></div>
+                                <div class="payment-info">
+                                    <span class="payment-name">Thanh toán khi nhận hàng (COD)</span>
+                                    <span class="payment-desc">Thanh toán bằng tiền mặt khi bạn nhận được hàng.</span>
+                                </div>
+                                <i class="bi bi-cash payment-icon"></i>
+                            </div>
+                            
+                            <div class="payment-option @(selectedMethod == "MoMo" ? "active" : "")" @onclick='() => SetPaymentMethod("MoMo")'>
+                                <div class="radio-indicator"></div>
+                                <div class="payment-info">
+                                    <span class="payment-name">Ví MoMo</span>
+                                    <span class="payment-desc">Thanh toán qua ứng dụng MoMo (Demo).</span>
+                                </div>
+                                <img src="https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png" class="payment-icon-img" alt="MoMo" />
+                            </div>
 
-                        <div class="price-row">
-                            <span>Giá trị đơn hàng</span>
-                            <span>@basket.TotalPrice.ToString("N0") đ</span>
+                            <div class="payment-option @(selectedMethod == "VNPay" ? "active" : "")" @onclick='() => SetPaymentMethod("VNPay")'>
+                                <div class="radio-indicator"></div>
+                                <div class="payment-info">
+                                    <span class="payment-name">VNPay</span>
+                                    <span class="payment-desc">Thanh toán quét mã QR (Demo).</span>
+                                </div>
+                                <img src="https://vnpay.vn/wp-content/uploads/2020/07/Logo-VNPAY700x350.png" class="payment-icon-img" alt="VNPay" />
+                            </div>
                         </div>
-                        <div class="price-row">
-                            <span>Giảm giá trực tiếp</span>
-                            <span class="text-danger">-0 đ</span>
-                        </div>
-                        <div class="price-row">
-                            <span>Phí vận chuyển</span>
-                            <span class="text-success">Miễn phí</span>
-                        </div>
-                        
-                        <div class="total-row mt-3">
-                            <span>Tổng tiền thanh toán</span>
-                            <span class="total-amount">@basket.TotalPrice.ToString("N0") đ</span>
-                        </div>
-                        <p class="tax-note">(Đã bao gồm thuế VAT)</p>
-
-                        <button class="btn btn-checkout w-100 mt-4" @onclick="HandleCheckout" disabled="@isProcessing">
-                            @if (isProcessing)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                <span>ĐANG XỬ LÝ...</span>
-                            }
-                            else
-                            {
-                                <span>THANH TOÁN</span>
-                            }
-                        </button>
                     </div>
+                </div>
 
-                    @if (!string.IsNullOrEmpty(successMessage))
-                    {
-                        <div class="alert alert-success mt-3 animate__animated animate__bounceIn">
-                            <i class="bi bi-check-circle-fill me-2"></i>@successMessage
+                <!-- Cột phải: Tóm tắt đơn hàng -->
+                <div class="col-lg-5">
+                    <div class="order-sidebar sticky-top" style="top: 20px;">
+                        <div class="coupon-box shadow-sm mb-4">
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0"><i class="bi bi-ticket-perforated"></i></span>
+                                <input type="text" class="form-control border-start-0" placeholder="Chọn hoặc nhập mã ưu đãi" />
+                                <button type="button" class="btn btn-outline-secondary">Xác nhận</button>
+                            </div>
                         </div>
-                    }
+
+                        <div class="order-summary-card shadow-sm">
+                            <h3 class="summary-title">Tóm tắt đơn hàng</h3>
+                            
+                            <div class="basket-items-list">
+                                @foreach (var item in basket.Items)
+                                {
+                                    <div class="basket-item-mini">
+                                        <div class="item-details">
+                                            <span class="item-name">@item.ProductName</span>
+                                            <div class="item-meta-mini">
+                                                @if (!string.IsNullOrEmpty(item.SelectedColor))
+                                                {
+                                                    <span class="badge bg-light text-dark border me-1">@item.SelectedColor</span>
+                                                }
+                                                @if (!string.IsNullOrEmpty(item.SelectedSize))
+                                                {
+                                                    <span class="badge bg-light text-dark border">@item.SelectedSize</span>
+                                                }
+                                            </div>
+                                            <span class="item-qty">Số lượng: @item.Quantity</span>
+                                        </div>
+                                        <div class="item-price">@((item.Price * item.Quantity).ToString("N0")) đ</div>
+                                    </div>
+                                }
+                            </div>
+
+                            <hr />
+
+                            <div class="price-row">
+                                <span>Giá trị đơn hàng</span>
+                                <span>@basket.TotalPrice.ToString("N0") đ</span>
+                            </div>
+                            <div class="price-row">
+                                <span>Giảm giá trực tiếp</span>
+                                <span class="text-danger">-0 đ</span>
+                            </div>
+                            <div class="price-row">
+                                <span>Phí vận chuyển</span>
+                                <span class="text-success">Miễn phí</span>
+                            </div>
+                            
+                            <div class="total-row mt-3">
+                                <span>Tổng tiền thanh toán</span>
+                                <span class="total-amount">@basket.TotalPrice.ToString("N0") đ</span>
+                            </div>
+                            <p class="tax-note">(Đã bao gồm thuế VAT)</p>
+
+                            <button type="submit" class="btn btn-checkout w-100 mt-4" disabled="@isProcessing">
+                                @if (isProcessing)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    <span>ĐANG XỬ LÝ...</span>
+                                }
+                                else
+                                {
+                                    <span>THANH TOÁN</span>
+                                }
+                            </button>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(successMessage))
+                        {
+                            <div class="alert alert-success mt-3 animate__animated animate__bounceIn">
+                                <i class="bi bi-check-circle-fill me-2"></i>@successMessage
+                            </div>
+                        }
+                    </div>
                 </div>
             </div>
-        </div>
+        </EditForm>
     }
 </div>
 
@@ -562,25 +544,43 @@
     private string selectedMethod = "COD";
     private Dictionary<string, string> validationErrors = new();
     
-    private List<Province>? vietnamData;
-    private List<District> currentDistricts = new();
-    private List<Ward> currentWards = new();
-
     private class CheckoutForm
     {
+        [Required(ErrorMessage = "Vui lòng nhập họ và tên")]
         public string FullName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Vui lòng nhập số điện thoại")]
+        [RegularExpression(@"^0\d{9}$", ErrorMessage = "Số điện thoại phải là 10 chữ số và bắt đầu bằng số 0")]
         public string PhoneNumber { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Vui lòng nhập email")]
+        [EmailAddress(ErrorMessage = "Email không đúng định dạng")]
         public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Vui lòng chọn Tỉnh / Thành phố")]
         public string Province { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Vui lòng chọn Quận / Huyện")]
         public string District { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Vui lòng chọn Phường / Xã")]
         public string Ward { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Vui lòng nhập địa chỉ chi tiết")]
         public string AddressDetail { get; set; } = string.Empty;
     }
+
+    private List<string> provinces = new();
+    private List<string> districts = new();
+    private List<string> wards = new();
+
+    private EditContext? editContext;
 
     private CheckoutForm checkoutForm = new();
 
     protected override async Task OnInitializedAsync()
     {
+        editContext = new EditContext(checkoutForm);
         await base.OnInitializedAsync();
         await LoadDataAsync();
         await HandleVnPayCallbackAsync();
@@ -623,7 +623,7 @@
                             {
                                 basketSnapshot.Items = basketSnapshot.Items.Where(i => i.IsSelected).ToList();
                             }
-                            await BasketService.ClearBasketAsync();
+                            await BasketService.RemoveSelectedItemsAsync();
                             await DeductStockFromBasketItems(basketSnapshot);
                             await EmailService.SendOrderConfirmationEmailAsync(checkoutForm.Email, checkoutForm.FullName, transaction.OrderId.ToString(), transaction.Amount);
                             
@@ -673,6 +673,12 @@
                 // Thanh toán thành công
                 if (query.TryGetValue("orderId", out var orderIdStr) && Guid.TryParse(orderIdStr, out var orderId))
                 {
+                    // Cập nhật trạng thái giao dịch sang Success nếu có transactionId
+                    if (query.TryGetValue("transactionId", out var txnIdStr) && Guid.TryParse(txnIdStr, out var txnId))
+                    {
+                        await PaymentApiService.UpdateTransactionStatusAsync(txnId, "Success");
+                    }
+
                     // Cập nhật trạng thái đơn hàng sang Pending
                     await OrderApiService.UpdateOrderStatusAsync(orderId, "Pending");
                     
@@ -685,7 +691,7 @@
                         basketSnapshot.Items = basketSnapshot.Items.Where(i => i.IsSelected).ToList();
                     }
                     var totalPrice = basketSnapshot?.TotalPrice ?? 0;
-                    await BasketService.ClearBasketAsync();
+                    await BasketService.RemoveSelectedItemsAsync();
                     await DeductStockFromBasketItems(basketSnapshot);
                     
                     if (!string.IsNullOrEmpty(checkoutForm.Email))
@@ -706,6 +712,10 @@
             }
             else
             {
+                if (query.TryGetValue("transactionId", out var txnIdStr) && Guid.TryParse(txnIdStr, out var txnId))
+                {
+                    await PaymentApiService.UpdateTransactionStatusAsync(txnId, "Failed");
+                }
                 var msg = query.TryGetValue("message", out var m) ? m.ToString() : "Thanh toán MoMo thất bại.";
                 errorMessage = msg;
             }
@@ -725,15 +735,9 @@
         isLoading = true;
         errorMessage = string.Empty;
 
-        // Load Vietnamese administrative data
-        try
-        {
-            vietnamData = await Http.GetFromJsonAsync<List<Province>>("sample-data/vietnam_provinces.json");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading address data: {ex.Message}");
-        }
+        // Initialize address service to load JSON data
+        await AddressService.InitializeAsync();
+        provinces = AddressService.GetProvinces();
 
         basket = await BasketService.GetBasketAsync();
         if (basket != null)
@@ -749,6 +753,7 @@
             checkoutForm.Email = user.Email;
             checkoutForm.PhoneNumber = user.PhoneNumber ?? "";
             
+            // Try to parse existing address
             if (!string.IsNullOrEmpty(user.Address))
             {
                 var parts = user.Address.Split(", ").Select(p => p.Trim()).ToList();
@@ -759,7 +764,8 @@
                     checkoutForm.District = parts[2];
                     checkoutForm.Province = parts[3];
                     
-                    UpdateAddressCascading();
+                    districts = AddressService.GetDistricts(checkoutForm.Province);
+                    wards = AddressService.GetWards(checkoutForm.District);
                 }
                 else
                 {
@@ -769,6 +775,30 @@
         }
 
         isLoading = false;
+        editContext?.NotifyValidationStateChanged();
+    }
+
+    private void OnProvinceChanged(string val)
+    {
+        checkoutForm.Province = val;
+        checkoutForm.District = "";
+        checkoutForm.Ward = "";
+        districts = AddressService.GetDistricts(checkoutForm.Province);
+        wards = new List<string>();
+        
+        editContext?.NotifyFieldChanged(FieldIdentifier.Create(() => checkoutForm.Province));
+        editContext?.NotifyFieldChanged(FieldIdentifier.Create(() => checkoutForm.District));
+        editContext?.NotifyFieldChanged(FieldIdentifier.Create(() => checkoutForm.Ward));
+    }
+
+    private void OnDistrictChanged(string val)
+    {
+        checkoutForm.District = val;
+        checkoutForm.Ward = "";
+        wards = AddressService.GetWards(checkoutForm.District);
+        
+        editContext?.NotifyFieldChanged(FieldIdentifier.Create(() => checkoutForm.District));
+        editContext?.NotifyFieldChanged(FieldIdentifier.Create(() => checkoutForm.Ward));
     }
 
     private void SetPaymentMethod(string method)
@@ -784,12 +814,15 @@
             return;
         }
 
+<<<<<<< HEAD
         if (!ValidateForm())
         {
             errorMessage = "Vui lòng kiểm tra lại thông tin giao hàng.";
             return;
         }
 
+=======
+>>>>>>> 01e01948543ddedd124e505abf73b0d1dc3ec60a
         Console.WriteLine($"[Checkout] Starting checkout for {checkoutForm.Email}. Method: {selectedMethod}");
 
         isProcessing = true;
@@ -860,7 +893,7 @@
             {
                 Console.WriteLine("[Checkout] Transaction creation returned null.");
                 // Vẫn ghi nhận đơn hàng nhưng báo lỗi thanh toán
-                await BasketService.ClearBasketAsync();
+                await BasketService.RemoveSelectedItemsAsync();
                 successMessage = $"Đơn hàng đã được tạo (Mã: {createdOrder.Id.ToString().Substring(0, 8)}), nhưng gặp sự cố khi tạo giao dịch thanh toán. Chúng tôi sẽ liên hệ bạn sớm!";
                 return;
             }
@@ -893,9 +926,9 @@
             {
                 basketSnapshot.Items = basketSnapshot.Items.Where(i => i.IsSelected).ToList();
             }
-            await BasketService.ClearBasketAsync();
+            await BasketService.RemoveSelectedItemsAsync();
             await DeductStockFromBasketItems(basketSnapshot);
-            await EmailService.SendOrderConfirmationEmailAsync(checkoutForm.Email, checkoutForm.FullName, createdOrder.Id.ToString(), basketSnapshot.TotalPrice);
+            await EmailService.SendOrderConfirmationEmailAsync(checkoutForm.Email, checkoutForm.FullName, createdOrder.Id.ToString(), basketSnapshot?.TotalPrice ?? 0);
 
             Console.WriteLine("[Checkout] Redirecting to success page.");
             Navigation.NavigateTo($"/success/{createdOrder.Id}");
@@ -1047,6 +1080,7 @@
 
     private void GoHome() => Navigation.NavigateTo("/");
 }
+
 
 
 
