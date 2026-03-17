@@ -542,7 +542,6 @@
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
     private string selectedMethod = "COD";
-    private Dictionary<string, string> validationErrors = new();
     
     private class CheckoutForm
     {
@@ -814,15 +813,6 @@
             return;
         }
 
-<<<<<<< HEAD
-        if (!ValidateForm())
-        {
-            errorMessage = "Vui lòng kiểm tra lại thông tin giao hàng.";
-            return;
-        }
-
-=======
->>>>>>> 01e01948543ddedd124e505abf73b0d1dc3ec60a
         Console.WriteLine($"[Checkout] Starting checkout for {checkoutForm.Email}. Method: {selectedMethod}");
 
         isProcessing = true;
@@ -985,96 +975,6 @@
         {
             errorMessage = $"Lỗi cập nhật tồn kho: {string.Join(", ", failedStockItems)}. Đơn hàng vẫn được ghi nhận.";
             StateHasChanged();
-        }
-    }
-
-    private bool ValidateForm()
-    {
-        validationErrors.Clear();
-        
-        if (string.IsNullOrWhiteSpace(checkoutForm.FullName))
-            validationErrors["FullName"] = "Vui lòng nhập họ và tên.";
-            
-        if (string.IsNullOrWhiteSpace(checkoutForm.PhoneNumber))
-            validationErrors["PhoneNumber"] = "Vui lòng nhập số điện thoại.";
-        else if (!Regex.IsMatch(checkoutForm.PhoneNumber, @"^0\d{9}$"))
-            validationErrors["PhoneNumber"] = "Số điện thoại phải có 10 chữ số và bắt đầu bằng số 0.";
-            
-        if (string.IsNullOrWhiteSpace(checkoutForm.Email))
-            validationErrors["Email"] = "Vui lòng nhập email.";
-        else if (!Regex.IsMatch(checkoutForm.Email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
-            validationErrors["Email"] = "Email không đúng định dạng.";
-            
-        if (string.IsNullOrWhiteSpace(checkoutForm.Province))
-            validationErrors["Province"] = "Vui lòng chọn tỉnh/thành phố.";
-            
-        if (string.IsNullOrWhiteSpace(checkoutForm.District))
-            validationErrors["District"] = "Vui lòng chọn quận/huyện.";
-            
-        if (string.IsNullOrWhiteSpace(checkoutForm.Ward))
-            validationErrors["Ward"] = "Vui lòng chọn phường/xã.";
-            
-        if (string.IsNullOrWhiteSpace(checkoutForm.AddressDetail))
-            validationErrors["AddressDetail"] = "Vui lòng nhập địa chỉ chi tiết.";
-            
-        return validationErrors.Count == 0;
-    }
-
-    private void OnProvinceChanged(ChangeEventArgs e)
-    {
-        checkoutForm.Province = e.Value?.ToString() ?? "";
-        checkoutForm.District = "";
-        checkoutForm.Ward = "";
-        UpdateAddressCascading();
-    }
-
-    private void OnDistrictChanged(ChangeEventArgs e)
-    {
-        checkoutForm.District = e.Value?.ToString() ?? "";
-        checkoutForm.Ward = "";
-        UpdateAddressCascading();
-    }
-
-    private void UpdateAddressCascading()
-    {
-        if (vietnamData == null) return;
-
-        // Try exact match or normalized match
-        var province = vietnamData.FirstOrDefault(p => p.Name == checkoutForm.Province || 
-                                                       p.Name == "Thành phố " + checkoutForm.Province || 
-                                                       p.Name == "Tỉnh " + checkoutForm.Province);
-        if (province != null)
-        {
-            checkoutForm.Province = province.Name; // Normalize
-            currentDistricts = province.Districts;
-            
-            var district = currentDistricts.FirstOrDefault(d => d.Name == checkoutForm.District ||
-                                                                d.Name == "Quận " + checkoutForm.District ||
-                                                                d.Name == "Huyện " + checkoutForm.District ||
-                                                                d.Name == "Thành phố " + checkoutForm.District);
-            if (district != null)
-            {
-                checkoutForm.District = district.Name; // Normalize
-                currentWards = district.Wards;
-                
-                var ward = currentWards.FirstOrDefault(w => w.Name == checkoutForm.Ward ||
-                                                            w.Name == "Phường " + checkoutForm.Ward ||
-                                                            w.Name == "Xã " + checkoutForm.Ward ||
-                                                            w.Name == "Thị trấn " + checkoutForm.Ward);
-                if (ward != null)
-                {
-                    checkoutForm.Ward = ward.Name; // Normalize
-                }
-            }
-            else
-            {
-                currentWards = new List<Ward>();
-            }
-        }
-        else
-        {
-            currentDistricts = new List<District>();
-            currentWards = new List<Ward>();
         }
     }
 
