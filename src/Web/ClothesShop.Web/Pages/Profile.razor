@@ -4,6 +4,7 @@
 @inject IAuthService AuthService
 @inject IVietnamAddressService AddressService
 @inject NavigationManager Navigation
+@inject HttpClient Http
 
 <div class="profile-page">
     <div class="container container-sm">
@@ -57,7 +58,7 @@
                                 <label class="form-label">Quận / Huyện</label>
                                 <select class="form-select" Value="@selectedDistrict" @onchange="OnDistrictChanged" disabled="@(string.IsNullOrEmpty(selectedProvince))">
                                     <option value="">Quận / Huyện</option>
-                                    @foreach (var district in currentDistricts)
+                                    @foreach (var district in districtsOfProvince)
                                     {
                                         <option value="@district" selected="@(selectedDistrict == district)">@district</option>
                                     }
@@ -67,7 +68,7 @@
                                 <label class="form-label">Phường / Xã</label>
                                 <select class="form-select" @bind="selectedWard" disabled="@(string.IsNullOrEmpty(selectedDistrict))">
                                     <option value="">Phường / Xã</option>
-                                    @foreach (var ward in currentWards)
+                                    @foreach (var ward in wardsOfDistrict)
                                     {
                                         <option value="@ward" selected="@(selectedWard == ward)">@ward</option>
                                     }
@@ -132,16 +133,14 @@
     private bool isSubmitting = false;
     private string? errorMessage;
     private string? successMessage;
-
-    // Address fields
     private string selectedProvince = "";
     private string selectedDistrict = "";
     private string selectedWard = "";
     private string detailAddress = "";
 
     private List<string> provinces = new();
-    private List<string> currentDistricts = new();
-    private List<string> currentWards = new();
+    private List<string> districtsOfProvince = new();
+    private List<string> wardsOfDistrict = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -203,13 +202,13 @@
 
     private void UpdateDistricts()
     {
-        currentDistricts = AddressService.GetDistricts(selectedProvince);
-        currentWards = new List<string>();
+        districtsOfProvince = AddressService.GetDistricts(selectedProvince);
+        wardsOfDistrict = new List<string>();
     }
 
     private void UpdateWards()
     {
-        currentWards = AddressService.GetWards(selectedDistrict);
+        wardsOfDistrict = AddressService.GetWards(selectedDistrict);
     }
 
     private async Task HandleUpdate()

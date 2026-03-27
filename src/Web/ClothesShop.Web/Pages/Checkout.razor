@@ -5,7 +5,10 @@
 @inject IOrderApiService OrderApiService
 @inject IProductApiService ProductService
 @inject IEmailService EmailService
+@inject HttpClient Http
 @inject IVietnamAddressService AddressService
+@using ClothesShop.Web.Models
+@using System.Text.RegularExpressions
 @using System.ComponentModel.DataAnnotations
 
 <div class="checkout-container">
@@ -539,7 +542,7 @@
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
     private string selectedMethod = "COD";
-
+    
     private class CheckoutForm
     {
         [Required(ErrorMessage = "Vui lòng nhập họ và tên")]
