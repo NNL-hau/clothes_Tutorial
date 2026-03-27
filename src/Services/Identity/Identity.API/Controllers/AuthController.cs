@@ -15,17 +15,20 @@ namespace Identity.API.Controllers
         private readonly IdentityDbContext _context;
         private readonly IJwtService _jwtService;
         private readonly IGoogleAuthService _googleAuthService;
+        private readonly IEmailService _emailService;
         private readonly ILogger<AuthController> _logger;
         
         public AuthController(
             IdentityDbContext context,
             IJwtService jwtService,
             IGoogleAuthService googleAuthService,
+            IEmailService emailService,
             ILogger<AuthController> logger)
         {
             _context = context;
             _jwtService = jwtService;
             _googleAuthService = googleAuthService;
+            _emailService = emailService;
             _logger = logger;
         }
         
@@ -248,6 +251,85 @@ namespace Identity.API.Controllers
             {
                 _logger.LogError(ex, "Error updating user profile");
                 return StatusCode(500, new { message = "An error occurred during profile update" });
+            }
+        }
+
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            try 
+            {
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email && u.FullName == request.Username);
+                if (user == null)
+                {
+                    // For security, don't reveal if user exists. 
+                    // But in a tutorial context, we might want to be more explicit.
+                    return BadRequest(new { message = "Thông tin không khớp với bất kỳ tài khoản nào." });
+                }
+
+                // Generate 6-digit OTP
+                var otp = new Random().Next(100000, 999999).ToString();
+                user.ResetOtp = otp;
+                user.ResetOtpExpiry = DateTime.UtcNow.AddMinutes(10);
+
+                await _context.SaveChangesAsync();
+
+                // Send Email
+                await _emailService.SendOtpEmailAsync(user.Email, otp);
+
+                return Ok(new { message = "Mã OTP đã được gửi đến email của bạn." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during forgot-password");
+                return StatusCode(500, new { message = "Lỗi hệ thống khi gửi OTP" });
+            }
+        }
+
+        [HttpPost("verify-otp")]
+        public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequest request)
+        {
+            try 
+            {
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+                if (user == null || user.ResetOtp != request.OtpCode || (user.ResetOtpExpiry != null && user.ResetOtpExpiry < DateTime.UtcNow))
+                {
+                    return BadRequest(new { message = "Mã OTP không hợp lệ hoặc đã hết hạn." });
+                }
+
+                return Ok(new { message = "Mã OTP hợp lệ." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during verify-otp");
+                return StatusCode(500, new { message = "Lỗi hệ thống khi xác thực OTP" });
+            }
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            try 
+            {
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+                if (user == null || user.ResetOtp != request.OtpCode || (user.ResetOtpExpiry != null && user.ResetOtpExpiry < DateTime.UtcNow))
+                {
+                    return BadRequest(new { message = "Yêu cầu không hợp lệ. Vui lòng xác thực lại OTP." });
+                }
+
+                // Update password
+                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+                user.ResetOtp = null; // Clear OTP after use
+                user.ResetOtpExpiry = null;
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new { message = "Đặt lại mật khẩu thành công." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during reset-password");
+                return StatusCode(500, new { message = "Lỗi hệ thống khi đặt lại mật khẩu" });
             }
         }
     }

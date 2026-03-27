@@ -61,4 +61,39 @@ namespace Identity.API.DTOs
         public string? Address { get; set; }
         public string? NewPassword { get; set; }
     }
+
+    public class ForgotPasswordRequest
+    {
+        [Required]
+        public string Username { get; set; } = string.Empty;
+        
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+    }
+
+    public class VerifyOtpRequest
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+        
+        [Required]
+        [StringLength(6, MinimumLength = 6)]
+        public string OtpCode { get; set; } = string.Empty;
+    }
+
+    public class ResetPasswordRequest
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+        
+        [Required]
+        public string OtpCode { get; set; } = string.Empty;
+        
+        [Required]
+        [MinLength(6)]
+        public string NewPassword { get; set; } = string.Empty;
+    }
 }

@@ -184,6 +184,17 @@
                         <div class="validation-error"><ValidationMessage For="@(() => verifyOtpModel.OtpCode)" /></div>
                     </div>
                     
+                    <div class="otp-timer-wrapper">
+                        @if (otpCountdownSeconds > 0)
+                        {
+                            <span class="otp-timer">Mã sẽ hết hạn sau: <strong>@FormattedCountdown</strong></span>
+                        }
+                        else
+                        {
+                            <span class="otp-timer expired">Mã đã hết hạn. <a href="javascript:void(0)" @onclick="HandleSendOtp">Gửi lại mã</a></span>
+                        }
+                    </div>
+                    
                     <div class="button-group">
                         <button type="button" class="secondary-btn" @onclick="GoBackToStep1">Quay lại</button>
                         <button type="submit" class="primary-btn">Xác nhận</button>
@@ -252,6 +263,11 @@
     private ResetPasswordModel resetPasswordModel = new();
     private string? forgotPasswordError;
     private string? forgotPasswordSuccess;
+
+    // Timer fields
+    private int otpCountdownSeconds = 0;
+    private System.Threading.Timer? otpTimer;
+    private string FormattedCountdown => $"{(otpCountdownSeconds / 60):D2}:{(otpCountdownSeconds % 60):D2}";
 
     protected override void OnInitialized()
     {
@@ -398,10 +414,35 @@
     
     private void CloseForgotPasswordModal()
     {
+        StopOtpTimer();
         showForgotPassword = false;
         forgotPasswordStep = 1;
         forgotPasswordError = null;
         forgotPasswordSuccess = null;
+    }
+    
+    private void StartOtpTimer()
+    {
+        StopOtpTimer();
+        otpCountdownSeconds = 600; // 10 minutes
+        otpTimer = new System.Threading.Timer(async _ =>
+        {
+            if (otpCountdownSeconds > 0)
+            {
+                otpCountdownSeconds--;
+                await InvokeAsync(StateHasChanged);
+            }
+            else
+            {
+                StopOtpTimer();
+            }
+        }, null, 0, 1000);
+    }
+
+    private void StopOtpTimer()
+    {
+        otpTimer?.Dispose();
+        otpTimer = null;
     }
     
     private void HandleInvalidForgotPassword()
@@ -455,6 +496,7 @@
             await AuthService.SendOtpAsync(forgotPasswordModel.Username, forgotPasswordModel.Email);
             verifyOtpModel.Email = forgotPasswordModel.Email;
             forgotPasswordStep = 2;
+            StartOtpTimer();
         }
         catch (Exception ex)
         {
@@ -476,6 +518,7 @@
             await AuthService.VerifyOtpAsync(verifyOtpModel.Email, verifyOtpModel.OtpCode);
             resetPasswordModel.Email = verifyOtpModel.Email;
             resetPasswordModel.OtpCode = verifyOtpModel.OtpCode;
+            StopOtpTimer();
             forgotPasswordStep = 3;
         }
         catch (Exception ex)
@@ -527,6 +570,7 @@
     
     private void GoBackToStep1()
     {
+        StopOtpTimer();
         forgotPasswordStep = 1;
         forgotPasswordError = null;
     }

@@ -48,6 +48,7 @@ builder.Services.AddAuthorization();
 // Add JWT Service
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IGoogleAuthService, GoogleAuthService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 // Configure Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -107,6 +108,30 @@ using (var scope = app.Services.CreateScope())
         try 
         {
             context.Database.EnsureCreated();
+
+            // Handle schema update for new OTP columns (since EnsureCreated doesn't handle existing tables)
+            try 
+            {
+                var conn = context.Database.GetDbConnection();
+                if (conn.State != System.Data.ConnectionState.Open) conn.Open();
+                using var command = conn.CreateCommand();
+                
+                // Add ResetOtp
+                try {
+                    command.CommandText = "ALTER TABLE Users ADD COLUMN ResetOtp VARCHAR(256);";
+                    command.ExecuteNonQuery();
+                } catch { /* Column might already exist */ }
+
+                // Add ResetOtpExpiry
+                try {
+                    command.CommandText = "ALTER TABLE Users ADD COLUMN ResetOtpExpiry DATETIME;";
+                    command.ExecuteNonQuery();
+                } catch { /* Column might already exist */ }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Error while ensuring columns exist. This is expected if they already exist.");
+            }
 
             // Ensure default admin account exists with correct credentials
             var existingAdmin = context.Users.FirstOrDefault(u => u.FullName == "admin" || u.Role == "Admin");

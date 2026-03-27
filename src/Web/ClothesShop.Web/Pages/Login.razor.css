@@ -819,3 +819,35 @@ button.ghost:hover {
     box-shadow: 0 10px 20px rgba(40, 167, 69, 0.3);
     animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
+
+.otp-timer-wrapper {
+    margin: 10px 0 20px;
+    text-align: center;
+    width: 100%;
+}
+
+.otp-timer {
+    font-size: 14px;
+    color: #666;
+}
+
+.otp-timer strong {
+    color: #2F9E92;
+    font-size: 16px;
+    margin-left: 5px;
+}
+
+.otp-timer.expired {
+    color: #ef4444;
+}
+
+.otp-timer a {
+    color: #2F9E92;
+    text-decoration: none;
+    font-weight: 600;
+    margin-left: 5px;
+}
+
+.otp-timer a:hover {
+    text-decoration: underline;
+}

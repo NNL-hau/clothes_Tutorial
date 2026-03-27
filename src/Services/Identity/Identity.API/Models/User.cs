@@ -26,5 +26,9 @@ namespace Identity.API.Models
         public string? PhoneNumber { get; set; }
         
         public string? Address { get; set; }
+
+        public string? ResetOtp { get; set; }
+
+        public DateTime? ResetOtpExpiry { get; set; }
     }
 }

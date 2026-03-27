@@ -46,6 +46,11 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__DefaultConnection=Server=clothes-db;Port=3306;Database=IdentityDb;User=root;Password=123456;
+      - EmailSettings__SmtpServer=smtp.gmail.com
+      - EmailSettings__SmtpPort=587
+      - EmailSettings__SenderEmail=anpham3082004@gmail.com
+      - EmailSettings__SenderName=ClothesShop Tutorial
+      - EmailSettings__SenderPassword=xzejfczopsxhzsdt
     ports:
       - "5001:80"
     depends_on:
