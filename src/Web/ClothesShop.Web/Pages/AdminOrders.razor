@@ -167,7 +167,15 @@
                     }
                 </div>
 
-                <div class="order-total">
+                @if (selectedOrder.CouponAmount > 0)
+                {
+                    <div class="order-total" style="padding-top: 10px; padding-bottom: 5px; border-top: 1px dashed #eee;">
+                        <span>Mã giảm giá (@selectedOrder.CouponCode):</span>
+                        <strong class="text-danger">-@selectedOrder.CouponAmount.ToString("N0") ₫</strong>
+                    </div>
+                }
+
+                <div class="order-total" style='border-top: @(selectedOrder.CouponAmount > 0 ? "none" : "2px solid #f0f0f0")'>
                     <strong>Tổng cộng:</strong>
                     <strong class="text-primary">@selectedOrder.TotalPrice.ToString("N0") ₫</strong>
                 </div>
@@ -265,6 +273,8 @@
         border-radius: 10px;
         font-weight: 700;
         font-size: 0.8rem;
+        white-space: nowrap;
+        display: inline-block;
     }
 
     .payment-method-badge {

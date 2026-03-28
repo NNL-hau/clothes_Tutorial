@@ -20,6 +20,8 @@ namespace ClothesShop.Web.Models
         string? CVV,
         string? PaymentMethodName,
         int PaymentMethod,
+        string? CouponCode,
+        decimal CouponAmount,
         List<CreateOrderItemRequest> OrderItems);
 
     public record CreateOrderItemRequest(Guid ProductId, string ProductName, decimal Price, int Quantity);

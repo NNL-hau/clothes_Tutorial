@@ -60,7 +60,7 @@ namespace ClothesShop.Web.Services
             try
             {
                 await AddAuthHeaderAsync();
-                var orders = await _httpClient.GetFromJsonAsync<List<OrderDto>>($"api/orders/user/{Uri.EscapeDataString(userName)}");
+                var orders = await _httpClient.GetFromJsonAsync<List<OrderDto>>($"api/orders?userName={Uri.EscapeDataString(userName)}");
                 return orders ?? new List<OrderDto>();
             }
             catch (Exception ex)

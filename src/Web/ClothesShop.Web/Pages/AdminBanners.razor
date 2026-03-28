@@ -230,6 +230,7 @@
         display: inline-flex;
         align-items: center;
     }
+
 </style>
 
 @code {
@@ -259,7 +260,7 @@
 
     private class BannerFormData
     {
-        public string Title { get; set; } = string.Empty;
+        public string? Title { get; set; } = string.Empty;
         public string? SubTitle { get; set; }
         public string ImageUrl { get; set; } = string.Empty;
         public string? LinkUrl { get; set; }
@@ -327,11 +328,13 @@
 
     private async Task SaveBanner()
     {
+        /* 
         if (string.IsNullOrWhiteSpace(formData.Title))
         {
             formError = "Vui lòng nhập tiêu đề";
             return;
         }
+        */
 
         if (string.IsNullOrWhiteSpace(formData.ImageUrl))
         {

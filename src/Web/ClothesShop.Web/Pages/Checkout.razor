@@ -7,6 +7,8 @@
 @inject IEmailService EmailService
 @inject HttpClient Http
 @inject IVietnamAddressService AddressService
+@inject ICouponApiService CouponService
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
 @using ClothesShop.Web.Models
 @using System.Text.RegularExpressions
 @using System.ComponentModel.DataAnnotations
@@ -113,30 +115,42 @@
                         <h2 class="section-title mt-5"><i class="bi bi-credit-card me-2"></i>Phương thức thanh toán</h2>
                         <div class="payment-selection mt-3">
                             <div class="payment-option @(selectedMethod == "COD" ? "active" : "")" @onclick='() => SetPaymentMethod("COD")'>
-                                <div class="radio-indicator"></div>
+                                <div class="payment-radio-wrapper">
+                                    <div class="radio-indicator"></div>
+                                </div>
+                                <div class="payment-logo-wrapper">
+                                    <img src="https://cdn-icons-png.flaticon.com/512/6491/6491490.png" class="payment-icon-img" alt="COD" />
+                                </div>
                                 <div class="payment-info">
                                     <span class="payment-name">Thanh toán khi nhận hàng (COD)</span>
-                                    <span class="payment-desc">Thanh toán bằng tiền mặt khi bạn nhận được hàng.</span>
+                                    <span class="payment-desc">Thanh toán tiền mặt khi nhận hàng sạch sẽ, an toàn.</span>
                                 </div>
-                                <i class="bi bi-cash payment-icon"></i>
                             </div>
                             
                             <div class="payment-option @(selectedMethod == "MoMo" ? "active" : "")" @onclick='() => SetPaymentMethod("MoMo")'>
-                                <div class="radio-indicator"></div>
+                                <div class="payment-radio-wrapper">
+                                    <div class="radio-indicator"></div>
+                                </div>
+                                <div class="payment-logo-wrapper">
+                                    <img src="https://developers.momo.vn/v3/assets/images/MOMO-Logo-App-6262c3743a290ef02396a24ea2b66c35.png" class="payment-icon-img" alt="MoMo" />
+                                </div>
                                 <div class="payment-info">
                                     <span class="payment-name">Ví MoMo</span>
-                                    <span class="payment-desc">Thanh toán qua ứng dụng MoMo (Demo).</span>
+                                    <span class="payment-desc">Thanh toán nhanh qua ứng dụng MoMo.</span>
                                 </div>
-                                <img src="https://upload.wikimedia.org/wikipedia/vi/f/fe/MoMo_Logo.png" class="payment-icon-img" alt="MoMo" />
                             </div>
 
                             <div class="payment-option @(selectedMethod == "VNPay" ? "active" : "")" @onclick='() => SetPaymentMethod("VNPay")'>
-                                <div class="radio-indicator"></div>
+                                <div class="payment-radio-wrapper">
+                                    <div class="radio-indicator"></div>
+                                </div>
+                                <div class="payment-logo-wrapper">
+                                    <img src="https://i.pinimg.com/736x/f9/5e/a2/f95ea23c297af3170d9d75173bed9d7e.jpg" class="payment-icon-img" alt="VNPay" />
+                                </div>
                                 <div class="payment-info">
                                     <span class="payment-name">VNPay</span>
-                                    <span class="payment-desc">Thanh toán quét mã QR (Demo).</span>
+                                    <span class="payment-desc">Thanh toán quét mã QR hoặc thẻ ngân hàng.</span>
                                 </div>
-                                <img src="https://vnpay.vn/wp-content/uploads/2020/07/Logo-VNPAY700x350.png" class="payment-icon-img" alt="VNPay" />
                             </div>
                         </div>
                     </div>
@@ -148,9 +162,39 @@
                         <div class="coupon-box shadow-sm mb-4">
                             <div class="input-group">
                                 <span class="input-group-text bg-white border-end-0"><i class="bi bi-ticket-perforated"></i></span>
-                                <input type="text" class="form-control border-start-0" placeholder="Chọn hoặc nhập mã ưu đãi" />
-                                <button type="button" class="btn btn-outline-secondary">Xác nhận</button>
+                                <input type="text" class="form-control border-start-0" placeholder="Chọn hoặc nhập mã ưu đãi" @bind="inputCouponCode" />
+                                <button type="button" class="btn btn-outline-secondary" @onclick="ApplyCoupon">Xác nhận</button>
                             </div>
+                            @if (!string.IsNullOrEmpty(couponMessage))
+                            {
+                                <div class="mt-2 small @(isCouponValid ? "text-success" : "text-danger")">
+                                    <i class="bi @(isCouponValid ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") me-1"></i>
+                                    @couponMessage
+                                </div>
+                            }
+                            @if (myCoupons.Any())
+                            {
+                                <div class="mt-3">
+                                    <h6 class="small text-muted fw-bold mb-2">Ví Voucher của bạn</h6>
+                                    <div class="saved-coupons-list" style="max-height: 200px; overflow-y: auto; padding-right: 5px;">
+                                        @foreach (var c in myCoupons)
+                                        {
+                                            <div class="d-flex align-items-center justify-content-between border rounded p-2 mb-2 bg-light">
+                                                <div>
+                                                    <div class="fw-bold" style="color: #2F4858;">@c.Code</div>
+                                                    <div class="small text-muted" style="font-size: 11px;">Đơn tối thiểu: @c.MinOrderAmount.ToString("N0")đ</div>
+                                                    <div class="small fw-bold text-danger" style="font-size: 12px;">
+                                                        GIẢM @(c.DiscountType == "Percent" ? c.DiscountValue + "%" : c.DiscountValue.ToString("N0") + "đ")
+                                                    </div>
+                                                </div>
+                                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" style="font-size: 12px;" @onclick="() => { inputCouponCode = c.Code; ApplyCoupon(); }">
+                                                    Chọn
+                                                </button>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
                         </div>
 
                         <div class="order-summary-card shadow-sm">
@@ -187,7 +231,7 @@
                             </div>
                             <div class="price-row">
                                 <span>Giảm giá trực tiếp</span>
-                                <span class="text-danger">-0 đ</span>
+                                <span class="text-danger">-@discountAmount.ToString("N0") đ</span>
                             </div>
                             <div class="price-row">
                                 <span>Phí vận chuyển</span>
@@ -196,7 +240,7 @@
                             
                             <div class="total-row mt-3">
                                 <span>Tổng tiền thanh toán</span>
-                                <span class="total-amount">@basket.TotalPrice.ToString("N0") đ</span>
+                                <span class="total-amount">@FinalTotalAmount.ToString("N0") đ</span>
                             </div>
                             <p class="tax-note">(Đã bao gồm thuế VAT)</p>
 
@@ -294,36 +338,47 @@
         box-shadow: 0 0 0 2px rgba(0,0,0,0.05);
     }
 
-    /* Payment Selection Styles */
+    /* Payment Selection Styles - Improved */
+    .payment-selection {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
     .payment-option {
         display: flex;
         align-items: center;
-        padding: 15px;
-        border: 1px solid #eee;
-        border-radius: 10px;
-        margin-bottom: 12px;
+        padding: 16px 20px;
+        border: 2px solid #f0f0f0;
+        border-radius: 12px;
         cursor: pointer;
-        transition: all 0.2s;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        background: #ffffff;
     }
 
     .payment-option:hover {
-        background: #f9f9f9;
-        border-color: #ddd;
+        border-color: #333;
+        background: #fafafa;
+        transform: translateX(4px);
     }
 
     .payment-option.active {
         border-color: #333;
         background: #fdfdfd;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+    }
+
+    .payment-radio-wrapper {
+        margin-right: 16px;
     }
 
     .radio-indicator {
-        width: 20px;
-        height: 20px;
+        width: 22px;
+        height: 22px;
         border-radius: 50%;
         border: 2px solid #ddd;
-        margin-right: 15px;
         position: relative;
+        transition: all 0.2s;
     }
 
     .payment-option.active .radio-indicator {
@@ -333,8 +388,8 @@
     .payment-option.active .radio-indicator::after {
         content: '';
         position: absolute;
-        width: 10px;
-        height: 10px;
+        width: 12px;
+        height: 12px;
         background: #333;
         border-radius: 50%;
         top: 50%;
@@ -342,20 +397,16 @@
         transform: translate(-50%, -50%);
     }
 
-    .payment-info {
-        flex-grow: 1;
-    }
-
-    .payment-name {
-        display: block;
-        font-weight: 600;
-        font-size: 15px;
-    }
-
-    .payment-desc {
-        display: block;
-        font-size: 12px;
-        color: #888;
+    .payment-logo-wrapper {
+        width: 45px;
+        height: 45px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 16px;
+        background: #f8f8f8;
+        border-radius: 8px;
+        padding: 6px;
     }
 
     .payment-icon {
@@ -364,8 +415,28 @@
     }
 
     .payment-icon-img {
-        height: 24px;
-        width: auto;
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+
+    .payment-info {
+        flex: 1;
+    }
+
+    .payment-name {
+        display: block;
+        font-weight: 700;
+        font-size: 15px;
+        color: #222;
+        margin-bottom: 2px;
+    }
+
+    .payment-desc {
+        display: block;
+        font-size: 12px;
+        color: #888;
+        line-height: 1.4;
     }
 
     /* Sidebar Styles */
@@ -543,6 +614,14 @@
     private string successMessage = string.Empty;
     private string selectedMethod = "COD";
     
+    // Coupon State
+    private string inputCouponCode = string.Empty;
+    private string couponMessage = string.Empty;
+    private bool isCouponValid = false;
+    private decimal discountAmount = 0;
+    private string appliedCouponCode = string.Empty;
+    private decimal FinalTotalAmount => basket != null ? Math.Max(0, basket.TotalPrice - discountAmount) : 0;
+
     private class CheckoutForm
     {
         [Required(ErrorMessage = "Vui lòng nhập họ và tên")]
@@ -576,12 +655,14 @@
     private EditContext? editContext;
 
     private CheckoutForm checkoutForm = new();
+    private List<CouponDto> myCoupons = new();
 
     protected override async Task OnInitializedAsync()
     {
         editContext = new EditContext(checkoutForm);
         await base.OnInitializedAsync();
         await LoadDataAsync();
+        await LoadMyCouponsAsync();
         await HandleVnPayCallbackAsync();
         await HandleMoMoCallbackAsync();
     }
@@ -623,7 +704,6 @@
                                 basketSnapshot.Items = basketSnapshot.Items.Where(i => i.IsSelected).ToList();
                             }
                             await BasketService.RemoveSelectedItemsAsync();
-                            await DeductStockFromBasketItems(basketSnapshot);
                             await EmailService.SendOrderConfirmationEmailAsync(checkoutForm.Email, checkoutForm.FullName, transaction.OrderId.ToString(), transaction.Amount);
                             
                             await Task.Delay(1500);
@@ -669,21 +749,12 @@
 
             if (momoResult == "0")
             {
-                // Thanh toán thành công
+                // Thanh toán thành công — momo-return đã xử lý DB, chỉ cần xóa giỏ và chuyển trang
                 if (query.TryGetValue("orderId", out var orderIdStr) && Guid.TryParse(orderIdStr, out var orderId))
                 {
-                    // Cập nhật trạng thái giao dịch sang Success nếu có transactionId
-                    if (query.TryGetValue("transactionId", out var txnIdStr) && Guid.TryParse(txnIdStr, out var txnId))
-                    {
-                        await PaymentApiService.UpdateTransactionStatusAsync(txnId, "Success");
-                    }
-
-                    // Cập nhật trạng thái đơn hàng sang Pending
-                    await OrderApiService.UpdateOrderStatusAsync(orderId, "Pending");
-                    
                     successMessage = "Thanh toán MoMo thành công!";
 
-                    // Lưu snapshot giỏ hàng và xóa giỏ hàng
+                    // Xóa giỏ hàng
                     var basketSnapshot = await BasketService.GetBasketAsync();
                     if (basketSnapshot != null)
                     {
@@ -691,8 +762,8 @@
                     }
                     var totalPrice = basketSnapshot?.TotalPrice ?? 0;
                     await BasketService.RemoveSelectedItemsAsync();
-                    await DeductStockFromBasketItems(basketSnapshot);
-                    
+
+                    // Gửi email xác nhận nếu có
                     if (!string.IsNullOrEmpty(checkoutForm.Email))
                     {
                         await EmailService.SendOrderConfirmationEmailAsync(
@@ -711,10 +782,7 @@
             }
             else
             {
-                if (query.TryGetValue("transactionId", out var txnIdStr) && Guid.TryParse(txnIdStr, out var txnId))
-                {
-                    await PaymentApiService.UpdateTransactionStatusAsync(txnId, "Failed");
-                }
+                // Thanh toán thất bại hoặc bị hủy
                 var msg = query.TryGetValue("message", out var m) ? m.ToString() : "Thanh toán MoMo thất bại.";
                 errorMessage = msg;
             }
@@ -726,8 +794,24 @@
     }
 
     
-    private bool stockDeductionFailed = false;
     private List<string> failedStockItems = new();
+
+    private async Task LoadMyCouponsAsync()
+    {
+        try
+        {
+            var savedCodes = await LocalStorage.GetItemAsync<List<string>>("saved_coupons") ?? new List<string>();
+            if (savedCodes.Any())
+            {
+                var activeCoupons = await CouponService.GetActiveAsync();
+                if (activeCoupons != null)
+                {
+                    myCoupons = activeCoupons.Where(c => savedCodes.Contains(c.Code)).ToList();
+                }
+            }
+        }
+        catch { }
+    }
 
     private async Task LoadDataAsync()
     {
@@ -777,6 +861,30 @@
         editContext?.NotifyValidationStateChanged();
     }
 
+    private async Task ApplyCoupon()
+    {
+        if (string.IsNullOrWhiteSpace(inputCouponCode)) return;
+        
+        couponMessage = "Đang kiểm tra...";
+        StateHasChanged();
+
+        var result = await CouponService.ValidateAsync(inputCouponCode, basket?.TotalPrice ?? 0);
+        if (result != null && result.Success)
+        {
+            isCouponValid = true;
+            appliedCouponCode = result.Code ?? inputCouponCode;
+            discountAmount = result.DiscountAmount;
+            couponMessage = result.Message;
+        }
+        else
+        {
+            isCouponValid = false;
+            appliedCouponCode = string.Empty;
+            discountAmount = 0;
+            couponMessage = result?.Message ?? "Mã giảm giá không hợp lệ.";
+        }
+    }
+
     private void OnProvinceChanged(string val)
     {
         checkoutForm.Province = val;
@@ -824,7 +932,7 @@
             // 1. Tạo Đơn hàng (Order)
             var orderRequest = new CreateOrderRequest(
                 UserName: !string.IsNullOrEmpty(checkoutForm.Email) ? checkoutForm.Email : checkoutForm.FullName,
-                TotalPrice: basket.TotalPrice,
+                TotalPrice: FinalTotalAmount,
                 FullName: checkoutForm.FullName, 
                 PhoneNumber: checkoutForm.PhoneNumber,
                 EmailAddress: checkoutForm.Email,
@@ -842,6 +950,8 @@
                 CVV: "",
                 PaymentMethodName: selectedMethod,
                 PaymentMethod: selectedMethod == "COD" ? 1 : (selectedMethod == "MoMo" ? 2 : 3),
+                CouponCode: isCouponValid ? appliedCouponCode : null,
+                CouponAmount: isCouponValid ? discountAmount : 0,
                 OrderItems: basket.Items.Select(i => {
                     var nameWithDetails = i.ProductName;
                     if (!string.IsNullOrEmpty(i.SelectedColor) || !string.IsNullOrEmpty(i.SelectedSize))
@@ -870,7 +980,7 @@
             var transactionRequest = new CreateTransactionRequest(
                 OrderId: createdOrder.Id,
                 UserName: !string.IsNullOrEmpty(checkoutForm.Email) ? checkoutForm.Email : checkoutForm.FullName,
-                Amount: basket.TotalPrice,
+                Amount: FinalTotalAmount,
                 PaymentMethod: selectedMethod,
                 FullName: checkoutForm.FullName,
                 Email: checkoutForm.Email,
@@ -900,24 +1010,31 @@
 
             if (selectedMethod == "MoMo")
             {
-                // Redirect đến trang MoMo demo nội bộ
-                // payUrl và qrCodeUrl thực từ MoMo sandbox để quét QR thật
-                var encodedPayUrl    = Uri.EscapeDataString(transaction.PaymentUrl ?? "");
-                var encodedQrCodeUrl = Uri.EscapeDataString(transaction.QrCodeUrl  ?? "");
-                var momoPageUrl = $"/momo-payment?orderId={createdOrder.Id}&transactionId={transaction.Id}&amount={basket.TotalPrice}&payUrl={encodedPayUrl}&qrCodeUrl={encodedQrCodeUrl}";
-                Console.WriteLine($"[Checkout] Redirecting to MoMo page. PayUrl: {transaction.PaymentUrl}, QrCodeUrl: {transaction.QrCodeUrl}");
-                Navigation.NavigateTo(momoPageUrl, forceLoad: true);
+                // Redirect thẳng ra payUrl của MoMo sandbox (giống VNPay)
+                if (!string.IsNullOrEmpty(transaction.PaymentUrl))
+                {
+                    Console.WriteLine($"[Checkout] Redirecting to MoMo PayUrl: {transaction.PaymentUrl}");
+                    Navigation.NavigateTo(transaction.PaymentUrl, forceLoad: true);
+                }
+                else
+                {
+                    // Fallback: dùng trang nội bộ nếu không có payUrl
+                    var encodedPayUrl    = Uri.EscapeDataString(transaction.PaymentUrl ?? "");
+                    var encodedQrCodeUrl = Uri.EscapeDataString(transaction.QrCodeUrl  ?? "");
+                    var momoPageUrl = $"/momo-payment?orderId={createdOrder.Id}&transactionId={transaction.Id}&amount={basket.TotalPrice}&payUrl={encodedPayUrl}&qrCodeUrl={encodedQrCodeUrl}";
+                    Console.WriteLine($"[Checkout] MoMo PayUrl empty, using internal page. QrCodeUrl: {transaction.QrCodeUrl}");
+                    Navigation.NavigateTo(momoPageUrl, forceLoad: true);
+                }
                 return;
             }
             
-            // COD và phương thức khác: trừ kho trước khi xóa giỏ
+            // COD và phương thức khác: xóa giỏ sau khi đặt hàng thành công
             var basketSnapshot = await BasketService.GetBasketAsync();
             if (basketSnapshot != null)
             {
                 basketSnapshot.Items = basketSnapshot.Items.Where(i => i.IsSelected).ToList();
             }
             await BasketService.RemoveSelectedItemsAsync();
-            await DeductStockFromBasketItems(basketSnapshot);
             await EmailService.SendOrderConfirmationEmailAsync(checkoutForm.Email, checkoutForm.FullName, createdOrder.Id.ToString(), basketSnapshot?.TotalPrice ?? 0);
 
             Console.WriteLine("[Checkout] Redirecting to success page.");
@@ -930,51 +1047,6 @@
         finally
         {
             isProcessing = false;
-        }
-    }
-
-    private async Task DeductStockFromBasketItems(CustomerBasket? snapshot = null)
-    {
-        var target = snapshot ?? basket;
-        if (target == null || !target.Items.Any())
-        {
-            Console.WriteLine("[Checkout] No basket items to deduct stock from.");
-            return;
-        }
-
-        Console.WriteLine($"[Checkout] Deducting stock for {target.Items.Count} item(s).");
-        stockDeductionFailed = false;
-        failedStockItems.Clear();
-
-        foreach (var item in target.Items)
-        {
-            try
-            {
-                Console.WriteLine($"[Checkout] Calling DeductStockAsync for {item.ProductName} x{item.Quantity}...");
-                var success = await ProductService.DeductStockAsync(item.ProductId, item.Quantity);
-                if (!success)
-                {
-                    Console.WriteLine($"[Checkout] API rejected stock deduction for {item.ProductName}.");
-                    stockDeductionFailed = true;
-                    failedStockItems.Add(item.ProductName);
-                }
-                else
-                {
-                    Console.WriteLine($"[Checkout] Stock deducted OK for {item.ProductName}.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Checkout] Error deducting stock for {item.ProductName}: {ex.Message}");
-                stockDeductionFailed = true;
-                failedStockItems.Add(item.ProductName);
-            }
-        }
-
-        if (stockDeductionFailed)
-        {
-            errorMessage = $"Lỗi cập nhật tồn kho: {string.Join(", ", failedStockItems)}. Đơn hàng vẫn được ghi nhận.";
-            StateHasChanged();
         }
     }
 

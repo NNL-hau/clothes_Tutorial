@@ -13,6 +13,8 @@ namespace ClothesShop.Web.Models
         string? Ward,
         string? AddressDetail,
         string? PaymentMethodName,
+        string? CouponCode,
+        decimal CouponAmount,
         List<OrderItemDto> OrderItems
     );
 

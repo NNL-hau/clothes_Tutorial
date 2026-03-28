@@ -2,7 +2,7 @@ namespace ClothesShop.Web.Models
 {
     public record BannerDto(
         Guid Id,
-        string Title,
+        string? Title,
         string? SubTitle,
         string ImageUrl,
         string? LinkUrl,
@@ -11,7 +11,7 @@ namespace ClothesShop.Web.Models
     );
 
     public record CreateBannerDto(
-        string Title,
+        string? Title,
         string? SubTitle,
         string ImageUrl,
         string? LinkUrl,

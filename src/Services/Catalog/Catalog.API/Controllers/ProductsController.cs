@@ -11,10 +11,12 @@ namespace Catalog.API.Controllers
     public class ProductsController : ControllerBase
     {
         private readonly CatalogDbContext _context;
+        private readonly ILogger<ProductsController> _logger;
 
-        public ProductsController(CatalogDbContext context)
+        public ProductsController(CatalogDbContext context, ILogger<ProductsController> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         [HttpGet]
@@ -106,6 +108,31 @@ namespace Catalog.API.Controllers
             Console.WriteLine($"[Catalog.API] Deducted stock for {id}. New Stock: {product.StockQuantity}, New Sold: {product.SoldQuantity}");
             return NoContent();
 
+        }
+
+        [HttpPatch("{id}/restore-stock")]
+        public async Task<IActionResult> RestoreStock(Guid id, [FromQuery] int quantity)
+        {
+            _logger.LogInformation("[Catalog API] Received restore-stock request for Product: {ProductGuid}, Quantity: {Qty}", id, quantity);
+            var product = await _context.Products.FindAsync(id);
+            if (product == null)
+            {
+                _logger.LogWarning("[Catalog API] Product {ProductGuid} not found for restore-stock", id);
+                return NotFound();
+            }
+
+            _logger.LogInformation("[Catalog API] Restoring stock for {ProductName}. Old Stock: {OldStock}, Old Sold: {OldSold}, Restore Qty: {Qty}", 
+                product.Name, product.StockQuantity, product.SoldQuantity, quantity);
+            
+            product.StockQuantity += quantity;
+            product.SoldQuantity = Math.Max(0, product.SoldQuantity - quantity);
+            
+            await _context.SaveChangesAsync();
+            
+            _logger.LogInformation("[Catalog API] Successfully restored stock for {ProductName}. New Stock: {NewStock}, New Sold: {NewSold}", 
+                product.Name, product.StockQuantity, product.SoldQuantity);
+            
+            return NoContent();
         }
 
         [HttpDelete("{id}")]

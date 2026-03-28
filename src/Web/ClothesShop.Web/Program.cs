@@ -52,6 +52,7 @@ builder.Services.AddScoped<ICategoryApiService, CategoryApiService>();
 builder.Services.AddScoped<IReviewApiService, ReviewApiService>();
 builder.Services.AddScoped<IPaymentApiService, PaymentApiService>();
 builder.Services.AddScoped<IBasketService, BasketService>();
+builder.Services.AddScoped<ICouponApiService, CouponApiService>();
 builder.Services.AddScoped<IVietnamAddressService, VietnamAddressService>();
 builder.Services.AddScoped<IChatApiService, ChatApiService>(sp => 
 {

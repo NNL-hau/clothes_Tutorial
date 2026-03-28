@@ -6,8 +6,8 @@ namespace Catalog.API.DTOs
     public record CreateCategoryDto(string Name, string? Description);
     public record CategoryDto(Guid Id, string Name, string? Description);
     
-    public record CreateBannerDto(string Title, string? SubTitle, string ImageUrl, string? LinkUrl, bool IsActive, int DisplayOrder);
-    public record BannerDto(Guid Id, string Title, string? SubTitle, string ImageUrl, string? LinkUrl, bool IsActive, int DisplayOrder);
+    public record CreateBannerDto(string? Title, string? SubTitle, string ImageUrl, string? LinkUrl, bool IsActive, int DisplayOrder);
+    public record BannerDto(Guid Id, string? Title, string? SubTitle, string ImageUrl, string? LinkUrl, bool IsActive, int DisplayOrder);
 
     public record ChatRequest(
         string Message, 

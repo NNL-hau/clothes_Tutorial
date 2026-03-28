@@ -6,9 +6,8 @@ namespace Catalog.API.Models
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         
-        [Required]
         [MaxLength(200)]
-        public string Title { get; set; } = string.Empty;
+        public string? Title { get; set; } = string.Empty;
         
         public string? SubTitle { get; set; }
         

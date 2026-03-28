@@ -131,6 +131,7 @@ code {
 :root {
     --primary-fashion: #4e73df;
     --primary-dark: #2e59d9;
+    --primary-color: #6366f1; /* Indigo color for primary actions */
     --secondary-fashion: #858796;
     --success-fashion: #1cc88a;
     --info-fashion: #36b9cc;
@@ -143,6 +144,7 @@ code {
     --glass-bg: rgba(255, 255, 255, 0.9);
     --sidebar-bg: #4e73df;
     --sidebar-text: #ffffff;
+    --transition: all 0.3s ease;
 }
 
 .glass-card {
@@ -288,24 +290,45 @@ code {
 
 .btn-primary-fashion,
 .btn-primary-custom {
-    background: var(--primary-fashion);
-    color: white;
+    background: var(--primary-color);
+    color: white !important;
     border: none;
     padding: 10px 20px;
     border-radius: 8px;
     font-weight: 600;
-    transition: all 0.3s;
+    transition: var(--transition);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     text-decoration: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary-fashion:hover,
 .btn-primary-custom:hover {
-    background: var(--primary-dark);
+    background: #4f46e5;
     transform: translateY(-2px);
-    color: white;
+    color: white !important;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-primary-fashion i,
+.btn-primary-custom i {
+    color: white !important;
+}
+
+.btn-primary-fashion:disabled,
+.btn-primary-custom:disabled {
+    background: #cbd5e1 !important; /* Slate light gray */
+    color: #94a3b8 !important; /* Lighter slate gray */
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.btn-primary-fashion:disabled i,
+.btn-primary-custom:disabled i {
+    color: #94a3b8 !important;
 }
 
 .btn-secondary-custom {

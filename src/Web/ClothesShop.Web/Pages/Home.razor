@@ -1,8 +1,50 @@
-﻿@page "/"
+@page "/"
+@using ClothesShop.Web.Services
 @inject NavigationManager Navigation
 @inject ICategoryApiService CategoryService
+@inject ICouponApiService CouponService
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Trang Chủ - Shop Quần Áo</PageTitle>
+
+@if (showLuckyDrop && luckyCoupon != null)
+{
+    <div class="lucky-drop-overlay animate__animated animate__fadeIn">
+        <div class="lucky-drop-box animate__animated animate__zoomIn">
+            <button class="lucky-close-btn" @onclick="CloseLuckyDrop"><i class="fa-solid fa-xmark"></i></button>
+            <div class="lucky-drop-header">
+                <i class="fa-solid fa-gift lucky-icon"></i>
+                <h3>Ưu đãi dành riêng cho bạn!</h3>
+                <p>Bạn vừa nhận được một mã giảm giá ngẫu nhiên. Nhanh tay sử dụng nhé!</p>
+            </div>
+            <div class="lucky-drop-body">
+                <div class="lucky-coupon-card">
+                    <div class="coupon-amount">
+                        @(luckyCoupon.DiscountType == "Percent" ? luckyCoupon.DiscountValue + "%" : luckyCoupon.DiscountValue.ToString("N0") + "đ")
+                    </div>
+                    <div class="coupon-details">
+                        <strong>@luckyCoupon.Code</strong>
+                        <span>@luckyCoupon.Description</span>
+                        <small>Đơn tối thiểu: @luckyCoupon.MinOrderAmount.ToString("N0")đ</small>
+                    </div>
+                </div>
+            </div>
+            <div class="lucky-drop-footer">
+                <button class="btn btn-copy-coupon w-100" @onclick="SaveCouponCode">
+                    @if (isCopied)
+                    {
+                        <span><i class="fa-solid fa-check"></i> Đã nhận mã thành công</span>
+                    }
+                    else
+                    {
+                        <span><i class="fa-solid fa-download"></i> Nhận mã</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
 
 <div class="home-page">
     <BannerCarousel />
@@ -240,8 +282,62 @@
         {
             Navigation.NavigateTo("/admin");
         }
+        else
+        {
+            await CheckLuckyDropAsync();
+        }
         
         categories = await CategoryService.GetCategoriesAsync();
+    }
+
+    private bool showLuckyDrop = false;
+    private CouponDto? luckyCoupon;
+    private bool isCopied = false;
+
+    private async Task CheckLuckyDropAsync()
+    {
+        try
+        {
+            // Chỉ thả mã nếu user đã đăng nhập
+            bool isAuthenticated = await AuthService.IsAuthenticatedAsync();
+            if (!isAuthenticated) return;
+
+            // Tạm thời ẩn điều kiện LocalStorage & Xác Suất 60% để dev/tester dễ xem
+            // var hasShown = await LocalStorage.GetItemAsync<bool>("lucky_drop_shown");
+            
+            var activeCoupons = await CouponService.GetActiveAsync();
+            if (activeCoupons != null && activeCoupons.Any())
+            {
+                var rand = new Random();
+                luckyCoupon = activeCoupons[rand.Next(activeCoupons.Count)];
+                showLuckyDrop = true;
+            }
+        }
+        catch { }
+    }
+
+    private void CloseLuckyDrop()
+    {
+        showLuckyDrop = false;
+    }
+
+    private async Task SaveCouponCode()
+    {
+        if (luckyCoupon != null)
+        {
+            var saved = await LocalStorage.GetItemAsync<List<string>>("saved_coupons") ?? new List<string>();
+            if (!saved.Contains(luckyCoupon.Code))
+            {
+                saved.Add(luckyCoupon.Code);
+                await LocalStorage.SetItemAsync("saved_coupons", saved);
+            }
+
+            isCopied = true;
+            StateHasChanged();
+            
+            await Task.Delay(2000);
+            showLuckyDrop = false; // Auto close limit
+        }
     }
 
     private void HandleKeyUp(KeyboardEventArgs e)
@@ -303,6 +399,136 @@
         max-width: 1400px;
         margin: 0 auto;
         padding: 0 20px;
+    }
+
+    /* ── Lucky Drop Overlay ── */
+    .lucky-drop-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(15, 23, 42, 0.7);
+        backdrop-filter: blur(4px);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .lucky-drop-box {
+        background: white;
+        width: 100%;
+        max-width: 420px;
+        border-radius: 24px;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+
+    .lucky-close-btn {
+        position: absolute;
+        top: 15px; right: 15px;
+        background: rgba(255,255,255,0.2);
+        border: none;
+        width: 32px; height: 32px;
+        border-radius: 50%;
+        color: white;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        transition: all 0.2s;
+        z-index: 10;
+    }
+    .lucky-close-btn:hover { background: rgba(255,255,255,0.4); transform: scale(1.1); }
+
+    .lucky-drop-header {
+        background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+        color: white;
+        text-align: center;
+        padding: 40px 20px 25px;
+        position: relative;
+    }
+
+    .lucky-icon {
+        font-size: 50px;
+        margin-bottom: 15px;
+        animation: tada 1.5s ease infinite;
+    }
+
+    .lucky-drop-header h3 {
+        font-size: 1.4rem; font-weight: 800; margin-bottom: 8px;
+    }
+    .lucky-drop-header p {
+        font-size: 0.9rem; opacity: 0.9; margin: 0;
+    }
+
+    .lucky-drop-body {
+        padding: 25px;
+        background: #f8fafc;
+    }
+
+    .lucky-coupon-card {
+        background: white;
+        border: 2px dashed #FF6B6B;
+        border-radius: 12px;
+        padding: 15px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .coupon-amount {
+        background: #fff0f0;
+        color: #FF6B6B;
+        font-size: 1.2rem;
+        font-weight: 800;
+        padding: 10px;
+        border-radius: 8px;
+        min-width: 80px;
+        text-align: center;
+    }
+
+    .coupon-details {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .coupon-details strong {
+        font-size: 1.1rem; color: #1e293b; letter-spacing: 1px;
+    }
+
+    .coupon-details span {
+        font-size: 0.8rem; color: #64748b; margin-top: 2px;
+    }
+
+    .coupon-details small {
+        font-size: 0.75rem; color: #94a3b8; margin-top: 4px; font-weight: 600;
+    }
+
+    .lucky-drop-footer {
+        padding: 0 25px 25px;
+        background: #f8fafc;
+    }
+
+    .btn-copy-coupon {
+        background: #1e293b;
+        color: white;
+        padding: 14px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 1rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s;
+    }
+    .btn-copy-coupon:hover { background: #0f172a; transform: translateY(-2px); }
+
+    @@keyframes tada {
+        0% {transform: scale3d(1, 1, 1);}
+        10%, 20% {transform: scale3d(.9, .9, .9) rotate3d(0, 0, 1, -3deg);}
+        30%, 50%, 70%, 90% {transform: scale3d(1.1, 1.1, 1.1) rotate3d(0, 0, 1, 3deg);}
+        40%, 60%, 80% {transform: scale3d(1.1, 1.1, 1.1) rotate3d(0, 0, 1, -3deg);}
+        100% {transform: scale3d(1, 1, 1);}
     }
 
     /* ── Features ── */

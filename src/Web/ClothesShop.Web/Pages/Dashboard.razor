@@ -191,13 +191,13 @@
     private List<Stat> QuickStats = new();
     private List<DashboardNote> LiveNotifications = new();
     private List<OrderDto> AllOrders = new();
-    private string SelectedPeriod = "month";
+    private string SelectedPeriod = "day";
     private string SelectedPeriodText => SelectedPeriod switch {
         "day" => "Ngày",
         "week" => "Tuần",
         "month" => "Tháng",
         "year" => "Năm",
-        _ => "Tháng"
+        _ => "Ngày"
     };
 
     protected override async Task OnInitializedAsync()
@@ -254,9 +254,7 @@
                 LiveNotifications.Add(new($"Bình luận mới: {pendingReview.UserName}", "Chờ duyệt", "review", "fa-solid fa-comment-dots"));
             }
 
-            // Initial chart render
-            await Task.Delay(100); // Give UI time to render canvas
-            await UpdateChart();
+            // Initial chart render will be handled after isLoading = false
         }
         catch (Exception ex)
         {
@@ -265,6 +263,11 @@
         finally
         {
             isLoading = false;
+            StateHasChanged(); 
+            
+            // Đợi một chút để DOM cập nhật canvas rồi mới vẽ biểu đồ
+            await Task.Delay(200);
+            await UpdateChart();
         }
     }
 

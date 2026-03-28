@@ -33,6 +33,7 @@ namespace Ordering.API.Controllers
 
             return await query
                 .Include(o => o.OrderItems)
+                .OrderByDescending(o => o.CreatedAt)
                 .Select(o => new OrderDto(
                     o.Id, 
                     o.UserName, 
@@ -46,6 +47,8 @@ namespace Ordering.API.Controllers
                     o.Ward,
                     o.AddressDetail,
                     o.PaymentMethodName,
+                    o.CouponCode,
+                    o.CouponAmount,
                     o.OrderItems.Select(oi => new OrderItemDto(oi.Id, oi.ProductId, oi.ProductName, oi.Price, oi.Quantity)).ToList()))
                 .ToListAsync();
         }
@@ -70,6 +73,8 @@ namespace Ordering.API.Controllers
                     o.Ward,
                     o.AddressDetail,
                     o.PaymentMethodName,
+                    o.CouponCode,
+                    o.CouponAmount,
                     o.OrderItems.Select(oi => new OrderItemDto(oi.Id, oi.ProductId, oi.ProductName, oi.Price, oi.Quantity)).ToList()))
                 .ToListAsync();
         }
@@ -103,6 +108,8 @@ namespace Ordering.API.Controllers
                 CVV = dto.CVV,
                 PaymentMethodName = dto.PaymentMethodName,
                 PaymentMethod = dto.PaymentMethod,
+                CouponCode = dto.CouponCode,
+                CouponAmount = dto.CouponAmount,
                 OrderStatus = initialStatus,
                 OrderItems = dto.OrderItems.Select(oi => new OrderItem
                 {
@@ -114,6 +121,17 @@ namespace Ordering.API.Controllers
             };
 
             _context.Orders.Add(order);
+
+            // Update Coupon usage if a code was applied
+            if (!string.IsNullOrEmpty(dto.CouponCode))
+            {
+                var coupon = await _context.Coupons.FirstOrDefaultAsync(c => c.Code == dto.CouponCode.Trim().ToUpper());
+                if (coupon != null)
+                {
+                    coupon.UsedCount++;
+                }
+            }
+
             await _context.SaveChangesAsync();
 
             // Nếu đơn hàng nhẩy thẳng vào trạng thái Pending (MoMo/VNPay), thực hiện trừ kho luôn
@@ -135,6 +153,8 @@ namespace Ordering.API.Controllers
                 order.Ward,
                 order.AddressDetail,
                 order.PaymentMethodName,
+                order.CouponCode,
+                order.CouponAmount,
                 order.OrderItems.Select(oi => new OrderItemDto(oi.Id, oi.ProductId, oi.ProductName, oi.Price, oi.Quantity)).ToList());
 
             return CreatedAtAction(nameof(GetOrder), new { id = order.Id }, result);
@@ -162,6 +182,8 @@ namespace Ordering.API.Controllers
                 o.Ward,
                 o.AddressDetail,
                 o.PaymentMethodName,
+                o.CouponCode,
+                o.CouponAmount,
                 o.OrderItems.Select(oi => new OrderItemDto(oi.Id, oi.ProductId, oi.ProductName, oi.Price, oi.Quantity)).ToList());
         }
 
@@ -192,6 +214,13 @@ namespace Ordering.API.Controllers
                 await DeductStockAsync(order);
             }
 
+            // Nếu hủy đơn mà trạng thái cũ là Pending (kho đã bị trừ),
+            // thì hoàn trả lại tồn kho
+            if (dto.Status == "Cancelled" && oldStatus == "Pending")
+            {
+                await RestoreStockAsync(order);
+            }
+
             return NoContent();
         }
 
@@ -211,22 +240,62 @@ namespace Ordering.API.Controllers
             {
                 try
                 {
-                    // PATCH /api/products/{id}/deduct-stock?quantity={qty}
-                    var response = await client.PatchAsync($"{catalogUrl}/{item.ProductId}/deduct-stock?quantity={item.Quantity}", null);
+                    var url = $"{catalogUrl}/{item.ProductId}/deduct-stock?quantity={item.Quantity}";
+                    _logger.LogInformation("[Ordering API] Calling Catalog API: {Url}", url);
+                    
+                    var response = await client.PatchAsync(url, null);
 
                     if (response.IsSuccessStatusCode)
                     {
-                        _logger.LogInformation("Successfully deducted {Quantity} for Product {ProductId}", item.Quantity, item.ProductId);
+                        _logger.LogInformation("[Ordering API] Successfully deducted stock for Product {ProductId}", item.ProductId);
                     }
                     else
                     {
                         var error = await response.Content.ReadAsStringAsync();
-                        _logger.LogError("Failed to deduct stock for Product {ProductId}: {Error}", item.ProductId, error);
+                        _logger.LogError("[Ordering API] Failed to deduct stock for Product {ProductId}. Status: {Status}, Error: {Error}", item.ProductId, response.StatusCode, error);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error calling Catalog API for Product {ProductId}", item.ProductId);
+                    _logger.LogError(ex, "[Ordering API] Exception calling Catalog API for Product {ProductId}", item.ProductId);
+                }
+            }
+        }
+
+        private async Task RestoreStockAsync(Order order)
+        {
+            _logger.LogInformation("Order {OrderId} is cancelled from Pending. Restoring stock...", order.Id);
+
+            var catalogUrl = _configuration["CatalogApiUrl"];
+            if (string.IsNullOrEmpty(catalogUrl))
+            {
+                _logger.LogError("CatalogApiUrl is not configured!");
+                return;
+            }
+
+            using var client = new HttpClient();
+            foreach (var item in order.OrderItems)
+            {
+                try
+                {
+                    var url = $"{catalogUrl}/{item.ProductId}/restore-stock?quantity={item.Quantity}";
+                    _logger.LogInformation("[Ordering API] Calling Catalog API (Restore): {Url}", url);
+
+                    var response = await client.PatchAsync(url, null);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation("[Ordering API] Successfully restored stock for Product {ProductId}", item.ProductId);
+                    }
+                    else
+                    {
+                        var error = await response.Content.ReadAsStringAsync();
+                        _logger.LogError("[Ordering API] Failed to restore stock for Product {ProductId}. Status: {Status}, Error: {Error}", item.ProductId, response.StatusCode, error);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[Ordering API] Exception calling Catalog API (Restore) for Product {ProductId}", item.ProductId);
                 }
             }
         }

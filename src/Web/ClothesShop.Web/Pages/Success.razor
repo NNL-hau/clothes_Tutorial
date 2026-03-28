@@ -56,6 +56,13 @@
 
                     <hr />
                     <div class="invoice-footer">
+                        @if (order.CouponAmount > 0)
+                        {
+                            <div class="total-price-row mb-2" style="font-size: 15px; color: #555;">
+                                <span>Mã giảm giá (@order.CouponCode):</span>
+                                <span class="text-danger">-@order.CouponAmount.ToString("N0") đ</span>
+                            </div>
+                        }
                         <div class="total-price-row">
                             <span>TỔNG CỘNG:</span>
                             <span class="total-amount">@order.TotalPrice.ToString("N0") đ</span>

@@ -11,6 +11,7 @@ namespace Ordering.API.Data
         
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
+        public DbSet<Coupon> Coupons { get; set; }
         
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -30,6 +31,15 @@ namespace Ordering.API.Data
                 entity.HasOne(d => d.Order)
                     .WithMany(p => p.OrderItems)
                     .HasForeignKey(d => d.OrderId);
+            });
+
+            modelBuilder.Entity<Coupon>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.Code).IsUnique();
+                entity.Property(e => e.DiscountValue).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.MaxDiscount).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.MinOrderAmount).HasColumnType("decimal(18,2)");
             });
         }
     }

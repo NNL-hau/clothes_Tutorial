@@ -52,7 +52,7 @@ if (app.Environment.IsDevelopment())
         {
             try 
             {
-                db.Database.EnsureCreated();
+                db.Database.Migrate(); // Apply pending migrations
                 break;
             }
             catch (Exception ex)

@@ -33,10 +33,14 @@ namespace Ordering.API.Models
         public string? PaymentMethodName { get; set; } // e.g., "COD", "MoMo"
         public int PaymentMethod { get; set; }
 
+        // Discount / Coupon
+        public string? CouponCode { get; set; }
+        public decimal CouponAmount { get; set; }
+
         [Required]
         public string OrderStatus { get; set; } = "Pending"; // Pending, InProgress, Shipped, Cancelled
 
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow.AddHours(7);
 
         public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
     }

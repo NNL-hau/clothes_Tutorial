@@ -1,0 +1,280 @@
+@page "/admin/coupons"
+@layout AdminLayout
+@inherits AuthorizedPageBase
+@inject ICouponApiService CouponService
+@using ClothesShop.Web.Services
+
+<PageTitle>Quản lý Mã Giảm Giá</PageTitle>
+
+<div class="admin-page">
+    <div class="page-header">
+        <div>
+            <h2>Quản lý Mã Giảm Giá</h2>
+            <p>Tạo và quản lý các mã quà tặng, ưu đãi cho khách hàng.</p>
+        </div>
+        <button class="btn btn-primary" @onclick="OpenAddModal">
+            <i class="bi bi-plus-lg me-2"></i>Tạo mã mới
+        </button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center my-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2">Đang tải dữ liệu...</p>
+        </div>
+    }
+    else
+    {
+        <div class="premium-card">
+            <div class="table-responsive">
+                <table class="table hover-table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Mã/Code</th>
+                            <th>Mô tả</th>
+                            <th>Loại - Giá trị</th>
+                            <th>Điều kiện</th>
+                            <th>Lượt dùng</th>
+                            <th>Trạng thái</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!coupons.Any())
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">Chưa có mã giảm giá nào</td>
+                            </tr>
+                        }
+                        @foreach (var c in coupons)
+                        {
+                            <tr>
+                                <td><span class="badge bg-dark fw-bold px-3 py-2">@c.Code</span></td>
+                                <td>@c.Description</td>
+                                <td>
+                                    <strong>@(c.DiscountType == "Percent" ? $"{c.DiscountValue}%" : $"{c.DiscountValue:N0}đ")</strong>
+                                    @if (c.DiscountType == "Percent" && c.MaxDiscount.HasValue)
+                                    {
+                                        <br/><small class="text-muted">Tối đa: @c.MaxDiscount.Value.ToString("N0")đ</small>
+                                    }
+                                </td>
+                                <td>
+                                    @if(c.MinOrderAmount > 0) { <span>Đơn tối thiểu: @c.MinOrderAmount.ToString("N0")đ</span> } 
+                                    else { <span>Không yêu cầu</span> }
+                                </td>
+                                <td>
+                                    @c.UsedCount / @(c.UsageLimit.HasValue ? c.UsageLimit.Value.ToString() : "∞")
+                                </td>
+                                <td>
+                                    <span class="badge @(c.IsActive ? "bg-success" : "bg-danger")">
+                                        @(c.IsActive ? "Đang chạy" : "Tạm dừng")
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary me-2" @onclick="() => OpenEditModal(c)">
+                                        <i class="bi bi-pencil me-1"></i>Sửa
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmDelete(c)">
+                                        <i class="bi bi-trash me-1"></i>Xóa
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@if (showModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5>@(isEditing ? "Sửa mã giảm giá" : "Tạo mã giảm giá mới")</h5>
+                <button type="button" class="btn-close" @onclick="CloseModal"></button>
+            </div>
+            <div class="modal-body">
+                <EditForm Model="currentCoupon" OnValidSubmit="SaveCoupon">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger" />
+
+                    <div class="mb-3">
+                        <label class="form-label">Mã Code (ví dụ: SALE10)</label>
+                        <InputText class="form-control" @bind-Value="currentCoupon.Code" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Mô tả ngắn</label>
+                        <InputText class="form-control" @bind-Value="currentCoupon.Description" placeholder="Ví dụ: Giảm 10% khách mới" />
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Loại giảm giá</label>
+                            <InputSelect class="form-select" @bind-Value="currentCoupon.DiscountType">
+                                <option value="Percent">Giảm theo %</option>
+                                <option value="Fixed">Giảm tiền trực tiếp</option>
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Giá trị giảm (@(currentCoupon.DiscountType == "Percent" ? "%" : "VNĐ"))</label>
+                            <InputNumber class="form-control" @bind-Value="currentCoupon.DiscountValue" />
+                        </div>
+                    </div>
+
+                    @if (currentCoupon.DiscountType == "Percent")
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Số tiền giảm tối đa (VNĐ)</label>
+                            <InputNumber class="form-control" @bind-Value="currentCoupon.MaxDiscount" placeholder="Để trống nếu không giới hạn" />
+                        </div>
+                    }
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Đơn hàng tối thiểu (VNĐ)</label>
+                            <InputNumber class="form-control" @bind-Value="currentCoupon.MinOrderAmount" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Số lượt dùng tối đa</label>
+                            <InputNumber class="form-control" @bind-Value="currentCoupon.UsageLimit" placeholder="Để trống = vô hạn" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <InputCheckbox class="form-check-input" id="isActive" @bind-Value="currentCoupon.IsActive" />
+                            <label class="form-check-label" for="isActive">Kích hoạt ngay</label>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseModal">Hủy</button>
+                        <button type="submit" class="btn btn-primary">Lưu mã</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .admin-page { padding: 24px; }
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .page-header h2 { margin: 0; font-weight: 700; color: #1e293b; }
+    .page-header p { margin: 5px 0 0; color: #64748b; }
+    .premium-card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
+    .hover-table tr:hover { background-color: #f8fafc; }
+    
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1050; display: flex; align-items: center; justify-content: center; }
+    .modal-content { background: white; width: 100%; max-width: 600px; border-radius: 16px; padding: 24px; }
+    .modal-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+    .form-control, .form-select { border-radius: 10px; padding: 10px 15px; border: 1px solid #e2e8f0; }
+    .btn { border-radius: 10px; padding: 10px 20px; font-weight: 600; }
+</style>
+
+@code {
+    private bool isLoading = true;
+    private List<CouponDto> coupons = new();
+    private bool showModal = false;
+    private bool isEditing = false;
+    private CouponForm currentCoupon = new();
+    private Guid? editingId;
+
+    public class CouponForm
+    {
+        public string Code { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string DiscountType { get; set; } = "Percent";
+        public decimal DiscountValue { get; set; } = 10;
+        public decimal? MaxDiscount { get; set; }
+        public decimal MinOrderAmount { get; set; } = 0;
+        public int? UsageLimit { get; set; }
+        public bool IsActive { get; set; } = true;
+        public DateTime? ExpiryDate { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCoupons();
+    }
+
+    private async Task LoadCoupons()
+    {
+        isLoading = true;
+        coupons = await CouponService.GetAllAsync();
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private void OpenAddModal()
+    {
+        isEditing = false;
+        editingId = null;
+        currentCoupon = new CouponForm();
+        showModal = true;
+    }
+
+    private void OpenEditModal(CouponDto c)
+    {
+        isEditing = true;
+        editingId = c.Id;
+        currentCoupon = new CouponForm
+        {
+            Code = c.Code,
+            Description = c.Description,
+            DiscountType = c.DiscountType,
+            DiscountValue = c.DiscountValue,
+            MaxDiscount = c.MaxDiscount,
+            MinOrderAmount = c.MinOrderAmount,
+            UsageLimit = c.UsageLimit,
+            IsActive = c.IsActive,
+            ExpiryDate = c.ExpiryDate
+        };
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+    }
+
+    private async Task SaveCoupon()
+    {
+        var request = new CreateCouponRequest(
+            currentCoupon.Code,
+            currentCoupon.Description,
+            currentCoupon.DiscountType,
+            currentCoupon.DiscountValue,
+            currentCoupon.DiscountType == "Percent" ? currentCoupon.MaxDiscount : null,
+            currentCoupon.MinOrderAmount,
+            currentCoupon.UsageLimit,
+            currentCoupon.IsActive,
+            currentCoupon.ExpiryDate
+        );
+
+        if (isEditing && editingId.HasValue)
+        {
+            await CouponService.UpdateAsync(editingId.Value, request);
+        }
+        else
+        {
+            await CouponService.CreateAsync(request);
+        }
+
+        CloseModal();
+        await LoadCoupons();
+    }
+
+    private async Task ConfirmDelete(CouponDto c)
+    {
+        // Simple confirm logic
+        await CouponService.DeleteAsync(c.Id);
+        await LoadCoupons();
+    }
+
+    protected override bool RequireAdminRole => true;
+}

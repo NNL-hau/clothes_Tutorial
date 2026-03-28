@@ -13,6 +13,8 @@ namespace Ordering.API.DTOs
         string? Ward,
         string? AddressDetail,
         string? PaymentMethodName,
+        string? CouponCode,
+        decimal CouponAmount,
         List<OrderItemDto> OrderItems);
     public record OrderItemDto(Guid Id, Guid ProductId, string ProductName, decimal Price, int Quantity);
     public record UpdateOrderStatusDto(string Status);
@@ -37,6 +39,8 @@ namespace Ordering.API.DTOs
         string? CVV,
         string? PaymentMethodName,
         int PaymentMethod,
+        string? CouponCode,
+        decimal CouponAmount,
         List<CreateOrderItemDto> OrderItems);
 
     public record CreateOrderItemDto(Guid ProductId, string ProductName, decimal Price, int Quantity);
