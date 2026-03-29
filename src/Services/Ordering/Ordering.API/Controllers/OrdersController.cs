@@ -125,10 +125,30 @@ namespace Ordering.API.Controllers
             // Update Coupon usage if a code was applied
             if (!string.IsNullOrEmpty(dto.CouponCode))
             {
-                var coupon = await _context.Coupons.FirstOrDefaultAsync(c => c.Code == dto.CouponCode.Trim().ToUpper());
+                var couponCode = dto.CouponCode.Trim().ToUpper();
+                var coupon = await _context.Coupons.FirstOrDefaultAsync(c => c.Code == couponCode);
                 if (coupon != null)
                 {
                     coupon.UsedCount++;
+                    
+                    // Đánh dấu mã đã dùng cho user cụ thể
+                    var userCoupon = await _context.UserCoupons
+                        .FirstOrDefaultAsync(uc => uc.UserName == dto.UserName && uc.CouponId == coupon.Id);
+                    
+                    if (userCoupon == null)
+                    {
+                        // Nếu user chưa "nhận" từ popup nhưng tự gõ mã, tạo record mới
+                        userCoupon = new UserCoupon
+                        {
+                            UserName = dto.UserName,
+                            CouponId = coupon.Id,
+                            ReceivedAt = DateTime.UtcNow.AddHours(7)
+                        };
+                        _context.UserCoupons.Add(userCoupon);
+                    }
+                    
+                    userCoupon.IsUsed = true;
+                    userCoupon.UsedAt = DateTime.UtcNow.AddHours(7);
                 }
             }
 

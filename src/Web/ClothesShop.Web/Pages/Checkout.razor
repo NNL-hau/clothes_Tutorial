@@ -172,29 +172,40 @@
                                     @couponMessage
                                 </div>
                             }
-                            @if (myCoupons.Any())
-                            {
-                                <div class="mt-3">
-                                    <h6 class="small text-muted fw-bold mb-2">Ví Voucher của bạn</h6>
-                                    <div class="saved-coupons-list" style="max-height: 200px; overflow-y: auto; padding-right: 5px;">
+                            <div class="mt-3">
+                                <h6 class="small fw-bold mb-2" style="color:#2F4858;">
+                                    <i class="bi bi-wallet2 me-1"></i>Ví Voucher của bạn
+                                </h6>
+                                <div class="saved-coupons-list">
+                                    @if (myCoupons.Any())
+                                    {
                                         @foreach (var c in myCoupons)
                                         {
-                                            <div class="d-flex align-items-center justify-content-between border rounded p-2 mb-2 bg-light">
-                                                <div>
-                                                    <div class="fw-bold" style="color: #2F4858;">@c.Code</div>
-                                                    <div class="small text-muted" style="font-size: 11px;">Đơn tối thiểu: @c.MinOrderAmount.ToString("N0")đ</div>
-                                                    <div class="small fw-bold text-danger" style="font-size: 12px;">
-                                                        GIẢM @(c.DiscountType == "Percent" ? c.DiscountValue + "%" : c.DiscountValue.ToString("N0") + "đ")
-                                                    </div>
+                                            <div class="wallet-coupon-item @(appliedCouponCode == c.Code ? "active" : "")">
+                                                <div class="wallet-discount-badge">
+                                                    @(c.DiscountType == "Percent"
+                                                        ? c.DiscountValue.ToString("0.##") + "%"
+                                                        : c.DiscountValue.ToString("N0") + "đ")
                                                 </div>
-                                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" style="font-size: 12px;" @onclick="() => { inputCouponCode = c.Code; ApplyCoupon(); }">
+                                                <div class="wallet-coupon-details">
+                                                    <span class="wallet-code">@c.Code</span>
+                                                    <span class="wallet-min">Đơn tối thiểu @c.MinOrderAmount.ToString("N0")đ</span>
+                                                </div>
+                                                <button type="button" class="wallet-select-btn" @onclick="() => { inputCouponCode = c.Code; ApplyCoupon(); }">
                                                     Chọn
                                                 </button>
                                             </div>
                                         }
-                                    </div>
+                                    }
+                                    else if (!isLoading)
+                                    {
+                                        <div class="wallet-empty-state">
+                                            <i class="bi bi-ticket-perforated-fill"></i>
+                                            <span>Bạn chưa có mã voucher nào.</span>
+                                        </div>
+                                    }
                                 </div>
-                            }
+                            </div>
                         </div>
 
                         <div class="order-summary-card shadow-sm">
@@ -604,6 +615,127 @@
         padding: 20px;
         border-top: 1px solid #f0f0f0;
     }
+
+    /* Custom scrollbar for Coupon List */
+    .saved-coupons-list::-webkit-scrollbar {
+        width: 4px;
+    }
+    .saved-coupons-list::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+    .saved-coupons-list::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 10px;
+    }
+    .saved-coupons-list::-webkit-scrollbar-thumb:hover {
+        background: #999;
+    }
+    
+    .saved-coupons-list {
+        max-height: 170px !important; /* Hiển thị khoảng 2 item */
+        overflow-y: auto;
+        padding-right: 8px;
+        margin-top: 10px;
+    }
+
+    .wallet-coupon-item {
+        display: flex;
+        align-items: center;
+        background: #fff;
+        border: 1px solid #eef0f2;
+        border-radius: 10px;
+        padding: 12px;
+        margin-bottom: 10px;
+        transition: all 0.2s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .wallet-coupon-item:hover {
+        border-color: #333;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .wallet-coupon-item.active {
+        border-color: #333;
+        background: #f9f9f9;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    .wallet-discount-badge {
+        flex-shrink: 0;
+        width: 50px;
+        height: 50px;
+        background: #333;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 13px;
+        margin-right: 12px;
+        text-align: center;
+        line-height: 1.2;
+    }
+
+    .wallet-coupon-details {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .wallet-code {
+        font-weight: 700;
+        font-size: 14px;
+        color: #2F4858;
+        margin-bottom: 2px;
+        text-transform: uppercase;
+    }
+
+    .wallet-min {
+        font-size: 11px;
+        color: #888;
+    }
+
+    .wallet-select-btn {
+        background: #fff;
+        border: 1px solid #333;
+        color: #333;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+
+    .wallet-select-btn:hover {
+        background: #333;
+        color: #fff;
+    }
+
+    .wallet-coupon-item.active .wallet-select-btn {
+        background: #333;
+        color: #fff;
+    }
+
+    .wallet-empty-state {
+        padding: 20px;
+        text-align: center;
+        background: #fcfcfc;
+        border: 1px dashed #ddd;
+        border-radius: 10px;
+        color: #999;
+        font-size: 13px;
+    }
+
+    .wallet-empty-state i {
+        display: block;
+        font-size: 24px;
+        margin-bottom: 8px;
+        opacity: 0.5;
+    }
 </style>
 
 @code {
@@ -620,6 +752,7 @@
     private bool isCouponValid = false;
     private decimal discountAmount = 0;
     private string appliedCouponCode = string.Empty;
+    private Guid? appliedCouponId;
     private decimal FinalTotalAmount => basket != null ? Math.Max(0, basket.TotalPrice - discountAmount) : 0;
 
     private class CheckoutForm
@@ -800,15 +933,36 @@
     {
         try
         {
+            var user = AuthService.CurrentUser;
+            if (user == null) return;
+
+            // 1. Lấy ví voucher từ Backend (mã đã nhận nhưng chưa dùng)
+            myCoupons = await CouponService.GetWalletAsync(user.Email);
+
+            // 2. Đồng bộ mã cũ từ LocalStorage lên Backend (cho user cũ chưa có dữ liệu trên Server)
             var savedCodes = await LocalStorage.GetItemAsync<List<string>>("saved_coupons") ?? new List<string>();
             if (savedCodes.Any())
             {
-                var activeCoupons = await CouponService.GetActiveAsync();
-                if (activeCoupons != null)
+                var allActiveCoupons = await CouponService.GetActiveAsync();
+                bool synced = false;
+                foreach (var code in savedCodes)
                 {
-                    myCoupons = activeCoupons.Where(c => savedCodes.Contains(c.Code)).ToList();
+                    if (!myCoupons.Any(mc => mc.Code == code))
+                    {
+                        var coupon = allActiveCoupons.FirstOrDefault(c => c.Code == code);
+                        if (coupon != null)
+                        {
+                            await CouponService.ReceiveAsync(coupon.Id, user.Email);
+                            myCoupons.Add(coupon);
+                            synced = true;
+                        }
+                    }
                 }
+                if (synced)
+                    myCoupons = myCoupons.OrderByDescending(c => c.CreatedAt).ToList();
             }
+
+            StateHasChanged();
         }
         catch { }
     }
@@ -873,6 +1027,7 @@
         {
             isCouponValid = true;
             appliedCouponCode = result.Code ?? inputCouponCode;
+            appliedCouponId = result.CouponId;
             discountAmount = result.DiscountAmount;
             couponMessage = result.Message;
         }
@@ -880,6 +1035,7 @@
         {
             isCouponValid = false;
             appliedCouponCode = string.Empty;
+            appliedCouponId = null;
             discountAmount = 0;
             couponMessage = result?.Message ?? "Mã giảm giá không hợp lệ.";
         }
@@ -1035,6 +1191,7 @@
                 basketSnapshot.Items = basketSnapshot.Items.Where(i => i.IsSelected).ToList();
             }
             await BasketService.RemoveSelectedItemsAsync();
+            
             await EmailService.SendOrderConfirmationEmailAsync(checkoutForm.Email, checkoutForm.FullName, createdOrder.Id.ToString(), basketSnapshot?.TotalPrice ?? 0);
 
             Console.WriteLine("[Checkout] Redirecting to success page.");

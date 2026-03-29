@@ -5,7 +5,10 @@ namespace ClothesShop.Web.Services
     public interface ICouponApiService
     {
         Task<List<CouponDto>> GetAllAsync();
-        Task<List<CouponDto>> GetActiveAsync();
+        Task<List<CouponDto>> GetActiveAsync(string? userName = null);
+        Task<List<CouponDto>> GetWalletAsync(string userName);
+        Task<bool> ReceiveAsync(Guid couponId, string userName);
+        Task<bool> MarkAsUsedAsync(Guid couponId, string userName);
         Task<CouponValidateResult?> ValidateAsync(string code, decimal orderAmount);
         Task<CouponDto?> CreateAsync(CreateCouponRequest dto);
         Task<bool> UpdateAsync(Guid id, CreateCouponRequest dto);
@@ -48,19 +51,66 @@ namespace ClothesShop.Web.Services
             }
         }
 
-        public async Task<List<CouponDto>> GetActiveAsync()
+        public async Task<List<CouponDto>> GetActiveAsync(string? userName = null)
         {
             try
             {
-                // Active coupons are usually public for users to see or validate, might not need auth if we allow guest validation
-                // But let's add auth header just in case.
-                var coupons = await _httpClient.GetFromJsonAsync<List<CouponDto>>("api/coupons/active");
+                var url = "api/coupons/active";
+                if (!string.IsNullOrEmpty(userName))
+                {
+                    url += $"?userName={Uri.EscapeDataString(userName)}";
+                }
+                var coupons = await _httpClient.GetFromJsonAsync<List<CouponDto>>(url);
                 return coupons ?? new List<CouponDto>();
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error fetching active coupons: {ex.Message}");
                 return new List<CouponDto>();
+            }
+        }
+
+        public async Task<List<CouponDto>> GetWalletAsync(string userName)
+        {
+            try
+            {
+                await AddAuthHeaderAsync();
+                var url = $"api/coupons/wallet?userName={Uri.EscapeDataString(userName)}";
+                var coupons = await _httpClient.GetFromJsonAsync<List<CouponDto>>(url);
+                return coupons ?? new List<CouponDto>();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching wallet coupons: {ex.Message}");
+                return new List<CouponDto>();
+            }
+        }
+
+        public async Task<bool> ReceiveAsync(Guid couponId, string userName)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/coupons/receive", new { CouponId = couponId, UserName = userName });
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error recording coupon receipt: {ex.Message}");
+                return false;
+            }
+        }
+
+        public async Task<bool> MarkAsUsedAsync(Guid couponId, string userName)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/coupons/use-by-user", new { CouponId = couponId, UserName = userName });
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error marking coupon as used: {ex.Message}");
+                return false;
             }
         }
 

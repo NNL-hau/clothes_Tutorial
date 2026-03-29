@@ -299,13 +299,13 @@
         try
         {
             // Chỉ thả mã nếu user đã đăng nhập
-            bool isAuthenticated = await AuthService.IsAuthenticatedAsync();
-            if (!isAuthenticated) return;
+            var user = await AuthService.GetCurrentUserAsync();
+            if (user == null) return;
 
             // Tạm thời ẩn điều kiện LocalStorage & Xác Suất 60% để dev/tester dễ xem
             // var hasShown = await LocalStorage.GetItemAsync<bool>("lucky_drop_shown");
             
-            var activeCoupons = await CouponService.GetActiveAsync();
+            var activeCoupons = await CouponService.GetActiveAsync(user.Email);
             if (activeCoupons != null && activeCoupons.Any())
             {
                 var rand = new Random();
@@ -330,6 +330,13 @@
             {
                 saved.Add(luckyCoupon.Code);
                 await LocalStorage.SetItemAsync("saved_coupons", saved);
+                
+                // Ghi nhận vào DB Backend
+                var user = await AuthService.GetCurrentUserAsync();
+                if (user != null)
+                {
+                    await CouponService.ReceiveAsync(luckyCoupon.Id, user.Email);
+                }
             }
 
             isCopied = true;

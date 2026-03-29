@@ -28,18 +28,73 @@ namespace Ordering.API.Controllers
                 .ToListAsync();
         }
 
-        // GET: api/coupons/active  (User - lấy mã đang active)
+        // GET: api/coupons/active  (User - lấy mã đang active mà chưa nhận)
         [HttpGet("active")]
-        public async Task<ActionResult<IEnumerable<CouponDto>>> GetActive()
+        public async Task<ActionResult<IEnumerable<CouponDto>>> GetActive(string? userName = null)
         {
             var now = DateTime.UtcNow.AddHours(7);
-            return await _context.Coupons
+            
+            var query = _context.Coupons
                 .Where(c => c.IsActive
                     && (c.ExpiryDate == null || c.ExpiryDate > now)
-                    && (c.UsageLimit == null || c.UsedCount < c.UsageLimit))
+                    && (c.UsageLimit == null || c.UsedCount < c.UsageLimit));
+
+            if (!string.IsNullOrEmpty(userName))
+            {
+                var receivedCouponIds = await _context.UserCoupons
+                    .Where(uc => uc.UserName == userName && !uc.IsUsed)
+                    .Select(uc => uc.CouponId)
+                    .ToListAsync();
+
+                query = query.Where(c => !receivedCouponIds.Contains(c.Id));
+            }
+
+            return await query
                 .OrderByDescending(c => c.CreatedAt)
                 .Select(c => MapToDto(c))
                 .ToListAsync();
+        }
+
+        // GET: api/coupons/wallet  (User - lấy mã còn hiệu lực chưa sử dụng)
+        [HttpGet("wallet")]
+        public async Task<ActionResult<IEnumerable<CouponDto>>> GetWallet(string userName)
+        {
+            if (string.IsNullOrEmpty(userName))
+                return BadRequest("userName is required.");
+
+            _logger.LogInformation("[CouponsAPI] Fetching wallet for user: {UserName}", userName);
+
+            var now = DateTime.UtcNow.AddHours(7);
+
+            // 1. Tìm danh sách CouponId mà user này ĐÃ DÙNG
+            var usedCouponIds = await _context.UserCoupons
+                .Where(uc => uc.UserName == userName && uc.IsUsed)
+                .Select(uc => uc.CouponId)
+                .ToListAsync();
+
+            _logger.LogInformation("[CouponsAPI] User {UserName} has used {Count} coupons.", userName, usedCouponIds.Count);
+
+            // 2. Lấy tất cả mã đang hoạt động vào bộ nhớ (vì số lượng mã ít, lọc trong bộ nhớ sẽ ổn định hơn SQL Translation)
+            var activeCoupons = await _context.Coupons
+                .Where(c => c.IsActive && (c.ExpiryDate == null || c.ExpiryDate > now))
+                .OrderByDescending(c => c.CreatedAt)
+                .ToListAsync();
+
+            _logger.LogInformation("[CouponsAPI] DB returned {Count} active coupons total.", activeCoupons.Count);
+
+            // 3. Lọc bỏ các mã mà user đã dùng bằng C# logic
+            var availableCoupons = activeCoupons
+                .Where(c => !usedCouponIds.Contains(c.Id))
+                .ToList();
+
+            _logger.LogInformation("[CouponsAPI] Found {Count} available coupons after filtering for {UserName}.", availableCoupons.Count, userName);
+
+            return availableCoupons.Select(c => MapToDto(c)).ToList();
+        }
+
+            _logger.LogInformation("[CouponsAPI] Found {Count} available coupons for {UserName}.", availableCoupons.Count, userName);
+
+            return availableCoupons.Select(c => MapToDto(c)).ToList();
         }
 
         // POST: api/coupons/validate  (Kiểm tra và tính toán giảm giá)
@@ -107,6 +162,49 @@ namespace Ordering.API.Controllers
             coupon.UsedCount++;
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        // POST: api/coupons/receive  (Ghi nhận user đã nhận mã)
+        [HttpPost("receive")]
+        public async Task<IActionResult> ReceiveCoupon([FromBody] ReceiveCouponRequest req)
+        {
+            if (string.IsNullOrEmpty(req.UserName)) return BadRequest("UserName is required.");
+
+            var exists = await _context.UserCoupons
+                .AnyAsync(uc => uc.UserName == req.UserName && uc.CouponId == req.CouponId);
+
+            if (!exists)
+            {
+                var userCoupon = new UserCoupon
+                {
+                    UserName = req.UserName,
+                    CouponId = req.CouponId,
+                    ReceivedAt = DateTime.UtcNow.AddHours(7)
+                };
+                _context.UserCoupons.Add(userCoupon);
+                await _context.SaveChangesAsync();
+            }
+
+            return Ok();
+        }
+
+        // POST: api/coupons/use-by-user  (Đánh dấu user đã dùng mã)
+        [HttpPost("use-by-user")]
+        public async Task<IActionResult> UseCouponByUser([FromBody] ReceiveCouponRequest req)
+        {
+            if (string.IsNullOrEmpty(req.UserName)) return BadRequest("UserName is required.");
+
+            var userCoupon = await _context.UserCoupons
+                .FirstOrDefaultAsync(uc => uc.UserName == req.UserName && uc.CouponId == req.CouponId);
+
+            if (userCoupon != null)
+            {
+                userCoupon.IsUsed = true;
+                userCoupon.UsedAt = DateTime.UtcNow.AddHours(7);
+                await _context.SaveChangesAsync();
+            }
+
+            return Ok();
         }
 
         // POST: api/coupons  (Admin tạo mã)
@@ -190,6 +288,8 @@ namespace Ordering.API.Controllers
         int? UsageLimit, bool IsActive, DateTime? ExpiryDate);
 
     public record ValidateCouponRequest(string Code, decimal OrderAmount);
+
+    public record ReceiveCouponRequest(Guid CouponId, string UserName);
 
     public record CouponValidateResult
     {

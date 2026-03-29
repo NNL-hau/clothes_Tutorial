@@ -52,7 +52,8 @@ if (app.Environment.IsDevelopment())
         {
             try 
             {
-                db.Database.Migrate(); // Apply pending migrations
+                // Chỉ migrate các thay đổi mới, không xóa dữ liệu cũ
+                db.Database.Migrate(); 
                 break;
             }
             catch (Exception ex)

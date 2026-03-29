@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Ordering.API.Data;
 
@@ -11,9 +12,11 @@ using Ordering.API.Data;
 namespace Ordering.API.Migrations
 {
     [DbContext(typeof(OrderingDbContext))]
-    partial class OrderingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260328113918_AddUserCouponSystem")]
+    partial class AddUserCouponSystem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -192,13 +195,7 @@ namespace Ordering.API.Migrations
                     b.Property<Guid>("CouponId")
                         .HasColumnType("char(36)");
 
-                    b.Property<bool>("IsUsed")
-                        .HasColumnType("tinyint(1)");
-
                     b.Property<DateTime>("ReceivedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<DateTime?>("UsedAt")
                         .HasColumnType("datetime(6)");
 
                     b.Property<string>("UserName")
